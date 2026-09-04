@@ -1,17 +1,13 @@
-import { NavLink, useLocation } from "react-router-dom"
+import { NavLink } from "react-router-dom"
 import {
   LayoutDashboard,
   Target,
   Clock,
-  Timer,
   Settings,
   Shield,
   LogOut,
-  Menu,
-  X,
 } from "lucide-react"
-import { useAppStore } from "@/store/appStore"
-import { Button } from "@/components/ui/Button"
+import { cn } from "@/lib/utils"
 
 const navItems = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard },
@@ -22,6 +18,15 @@ const navItems = [
 ]
 
 function Sidebar({ collapsed }: { collapsed: boolean }) {
+  const linkClass = ({ isActive }: { isActive: boolean }) =>
+    cn(
+      "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+      collapsed && "justify-center px-0",
+      isActive
+        ? "bg-brand-50 text-brand-700"
+        : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+    )
+
   return (
     <aside
       className={cn(
@@ -46,20 +51,8 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
       {/* Nav */}
       <nav className="flex-1 py-3 px-2 space-y-0.5">
         {navItems.map(({ to, label, icon: Icon }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              cn(
-                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
-                collapsed && "justify-center px-0",
-                isActive
-                  ? "bg-brand-50 text-brand-700"
-                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
-              )
-            }
-          >
-            {({ isActive }: { isActive: boolean }) => (
+          <NavLink key={to} to={to} className={linkClass}>
+            {({ isActive }) => (
               <>
                 <Icon className={cn("h-4 w-4 shrink-0", isActive && "text-brand-600")} />
                 {!collapsed && <span>{label}</span>}
@@ -71,28 +64,13 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
 
       {/* Footer */}
       <div className="border-t border-slate-100 p-2">
-        <NavLink
-          to="/login"
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors text-slate-500 hover:bg-slate-50 hover:text-slate-900",
-              collapsed && "justify-center px-0"
-            )
-          }
-        >
+        <NavLink to="/login" className={linkClass}>
           <LogOut className="h-4 w-4 shrink-0" />
           {!collapsed && <span>Log out</span>}
         </NavLink>
       </div>
     </aside>
   )
-}
-
-// Re-export Button (for closures below)
-import { clsx } from "clsx"
-import { twMerge } from "tailwind-merge"
-function cn(...i: any[]) {
-  return twMerge(clsx(i))
 }
 
 export { Sidebar }

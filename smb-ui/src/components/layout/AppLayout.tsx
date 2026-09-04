@@ -6,7 +6,6 @@ import { useAppStore } from "@/store/appStore"
 import { useIsMobile } from "@/hooks/useMobile"
 import { Sheet, SheetContent } from "@/components/ui/Sheet"
 import { X } from "lucide-react"
-import { Button } from "@/components/ui/Button"
 
 function AppLayout() {
   const sidebarState = useAppStore((s) => s.sidebarState)

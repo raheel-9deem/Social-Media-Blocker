@@ -18,7 +18,7 @@ export function useIsMobile(breakpoint = 768): boolean {
 }
 
 export function useInterval(callback: () => void, delay: number | null) {
-  const savedCallback = useCallback(callback, [callback])
+  const savedCallback = useCallback(() => callback(), [callback])
 
   useEffect(() => {
     if (delay === null) return

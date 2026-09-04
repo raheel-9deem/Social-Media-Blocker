@@ -2,7 +2,6 @@ import * as React from "react"
 import { createPortal } from "react-dom"
 import { cn } from "@/lib/utils"
 import { X } from "lucide-react"
-import { Button } from "@/components/ui/Button"
 
 interface SheetContextValue {
   open: boolean
@@ -78,16 +77,9 @@ function Sheet({ open, onOpenChange, side = "right", children }: SheetProps) {
   )
 }
 
-const sideSlideKeyframes = {
-  left: "slide-in-left",
-  right: "slide-in-right",
-  top: "slide-in-top",
-  bottom: "slide-in-bottom",
-}
-
-// Inject keyframes once
+// Inject animation keyframes
 if (typeof document !== "undefined") {
-  const styleId = "sheet-animations"
+const styleId = "sheet-animations"
   if (!document.getElementById(styleId)) {
     const style = document.createElement("style")
     style.id = styleId

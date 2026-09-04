@@ -22,9 +22,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts"
-import { useTimerStore } from "@/store/timerStore"
 import { useBlockingStore } from "@/store/blockingStore"
-import { useAppStore } from "@/store/appStore"
 import { format } from "date-fns"
 import { useEffect } from "react"
 
@@ -41,13 +39,9 @@ const platforms = [
 ]
 
 // Set initial blocking status
+// Set initial blocking status
 function DashboardPageContent() {
-  const timerStore = useTimerStore()
   const blockingStore = useBlockingStore()
-  const appStore = useAppStore()
-
-  // Tick every second for live timers
-  // (useTimerStore already has a tick method)
 
   // Simulate some blocked platforms based on mock data
   const blocks = useMemo(() => {
@@ -84,22 +78,23 @@ function DashboardPageContent() {
     blockingStore.setAllBlocks(blocks)
   }, [blocks, blockingStore])
 
-  const today = new Date()
+  const today = useMemo(() => new Date(), [])
+
   const weekData = useMemo(() => {
     const days = []
-    const d = new Date(today)
     for (let i = 6; i >= 0; i--) {
-      const day = new Date(d)
+      const day = new Date(today)
       day.setDate(day.getDate() - i)
-      const val = Math.floor(Math.random() * 120) + 40
+      // Deterministic: vary by day-of-week + day-of-month
+      const noise = ((day.getDay() + day.getDate()) % 5) * 10 + 40
       days.push({
         day: format(day, "EEE"),
-        minutes: i === 0 ? TODAY_USAGE : val,
+        minutes: i === 0 ? TODAY_USAGE : noise,
         limit: 240,
       })
     }
     return days
-  }, [])
+  }, [today])
 
   const focusActive = false
 

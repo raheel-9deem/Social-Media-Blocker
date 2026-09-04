@@ -1,5 +1,4 @@
-import { Menu, X } from "lucide-react"
-import { Button } from "@/components/ui/Button"
+import { Menu } from "lucide-react"
 import { useAppStore } from "@/store/appStore"
 
 function Header({

@@ -1,9 +1,8 @@
 import { useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { Shield, Clock, Smartphone } from "lucide-react"
+import { Clock, Smartphone } from "lucide-react"
 import { Button } from "@/components/ui/Button"
 import { Toggle } from "@/components/ui/Toggle"
-import { Badge } from "@/components/ui/Badge"
 import { Card } from "@/components/ui/Card"
 
 type Step = 1 | 2 | 3
@@ -46,8 +45,6 @@ const PLATFORMS = [
   { name: "Facebook", icon: "👤" },
   { name: "Reddit", icon: "🤖" },
 ] as const
-
-const LIMITS = [15, 30, 60, 90, 120] // minutes
 
 function OnboardingPage() {
   const navigate = useNavigate()
