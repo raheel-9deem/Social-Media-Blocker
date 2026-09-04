@@ -1,0 +1,98 @@
+import { NavLink, useLocation } from "react-router-dom"
+import {
+  LayoutDashboard,
+  Target,
+  Clock,
+  Timer,
+  Settings,
+  Shield,
+  LogOut,
+  Menu,
+  X,
+} from "lucide-react"
+import { useAppStore } from "@/store/appStore"
+import { Button } from "@/components/ui/Button"
+
+const navItems = [
+  { to: "/app", label: "Dashboard", icon: LayoutDashboard },
+  { to: "/app/platforms", label: "Platforms", icon: Shield },
+  { to: "/app/tracker", label: "Tracker", icon: Clock },
+  { to: "/app/focus", label: "Focus Mode", icon: Target },
+  { to: "/app/settings", label: "Settings", icon: Settings },
+]
+
+function Sidebar({ collapsed }: { collapsed: boolean }) {
+  return (
+    <aside
+      className={cn(
+        "h-screen border-r border-slate-200 bg-white flex flex-col transition-all duration-300 sticky top-0",
+        collapsed ? "w-16" : "w-60"
+      )}
+    >
+      {/* Logo */}
+      <div className="h-14 flex items-center px-3 border-b border-slate-100">
+        {collapsed ? (
+          <Shield className="h-6 w-6 text-brand-600 mx-auto" />
+        ) : (
+          <div className="flex items-center gap-2">
+            <Shield className="h-5 w-5 text-brand-600" />
+            <span className="font-semibold text-slate-900 text-sm">
+              MediaBlocker
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 py-3 px-2 space-y-0.5">
+        {navItems.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            className={({ isActive }) =>
+              cn(
+                "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors",
+                collapsed && "justify-center px-0",
+                isActive
+                  ? "bg-brand-50 text-brand-700"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+              )
+            }
+          >
+            {({ isActive }: { isActive: boolean }) => (
+              <>
+                <Icon className={cn("h-4 w-4 shrink-0", isActive && "text-brand-600")} />
+                {!collapsed && <span>{label}</span>}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
+
+      {/* Footer */}
+      <div className="border-t border-slate-100 p-2">
+        <NavLink
+          to="/login"
+          className={({ isActive }) =>
+            cn(
+              "flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-medium transition-colors text-slate-500 hover:bg-slate-50 hover:text-slate-900",
+              collapsed && "justify-center px-0"
+            )
+          }
+        >
+          <LogOut className="h-4 w-4 shrink-0" />
+          {!collapsed && <span>Log out</span>}
+        </NavLink>
+      </div>
+    </aside>
+  )
+}
+
+// Re-export Button (for closures below)
+import { clsx } from "clsx"
+import { twMerge } from "tailwind-merge"
+function cn(...i: any[]) {
+  return twMerge(clsx(i))
+}
+
+export { Sidebar }
