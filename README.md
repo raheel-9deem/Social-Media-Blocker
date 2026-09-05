@@ -212,34 +212,27 @@ All components are built with `class-variance-authority` (CVA), `clsx`, and `tai
 
 ---
 
-## Data Model (Planned)
+## Data Model (In-Memory)
 
 ```
-profiles (users)
-  └── platforms (per-user, with daily limits)
-        └── usage_logs (time-series)
-  └── focus_sessions (manual mode)
-  └── scheduled_blocks (recurring time windows)
-  └── namaz_settings (opt-in prayer config)
-  └── analytics_daily (pre-aggregated daily stats)
-  └── limit_config (per-day-of-week overrides)
+platforms (with daily limits)
+  └── usage_logs (time-series)
+focus_sessions (manual mode)
+scheduled_blocks (recurring time windows)
+namaz_settings (opt-in prayer config)
+analytics_daily (pre-aggregated daily stats)
+limit_config (per-day-of-week overrides)
 ```
 
-Full schema with RLS policies is defined in `ARCHITECTURE.md`.
+All data is stored in-memory and resets when the browser restarts. Full schema with RLS policies is defined in `ARCHITECTURE.md` for future backend integration.
 
 ---
 
 ## Roadmap
 
-### Additional context
-
 - Standalone Chrome extension — no account, no auth, no backend
 - Data is in-memory during a session (resets when browser restarts)
 - All core logic in `src/core/` — platform-independent
-
-> [!NOTE]
-> When the manifest says **Version 2**, remove the explicit version and use `"manifest_version": 3`. When it says **Manifest V3**, the manifest is already correct.
-> Double-check the extension copy: if there is no value, delete that section. The extension is fully self-contained — just load the `extension/` folder.
 
 ### Done
 - [x] Project scaffolding (Vite + React + TypeScript)
