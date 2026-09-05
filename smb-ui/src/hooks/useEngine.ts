@@ -191,6 +191,10 @@ export function useEngine(): EngineState {
     }
   }, [])
 
+  // Track pending sends to avoid duplicate APPLY_BLOCK messages
+  var pendingSentRef = useRef<Set<string>>(new Set())
+  pendingSentRef.current = pendingSentRef.current // stabilize reference for deps
+
   const evaluate = useCallback(async (): Promise<EvaluationResult> => {
     try {
       // Fetch latest platforms
@@ -243,12 +247,31 @@ export function useEngine(): EngineState {
       setAllBlocks(blockMap as Record<string, { status: "blocked" | "allowed"; reason: string | null; unblockAt: string | null; activeRules: string[] }>)
       setLastEvaluated(now)
 
+      // ---- Bridge: sync blocking decisions to background service worker ----
+      var blockedPids: string[] = []
+      for (var bd = result.decisions.entries(), entry; !(entry = bd.next()).done;) {
+        var bp = entry.value[0]
+        var bd2 = entry.value[1]
+        if (bd2.isBlocked) blockedPids.push(bp)
+      }
+      var bkey = blockedPids.sort().join(",")
+      if (!pendingSentRef.current.has(bkey)) {
+        pendingSentRef.current.add(bkey)
+        if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
+          chrome.runtime.sendMessage({
+            type: "APPLY_BLOCK",
+            isBlocked: blockedPids.length > 0,
+            blockedHosts: blockedPids,
+          }).catch(function () {})
+        }
+      }
+
       return result
     } catch (e) {
       reportError(e)
       return { decisions: new Map(), hasAnyBlock: false }
     }
-  }, [evaluator, resetManager, setAllBlocks])
+  }, [evaluator, resetManager, setAllBlocks]) // pendingSentRef is a stable ref
 
   const ingestLogs = useCallback(async () => {
     const logs = await inMemoryStorage.getUsageLogs(new Date(0), new Date())

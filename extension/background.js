@@ -7,15 +7,22 @@ var STATE_KEY = "mediaBlockerState"
 
 function loadState() {
   try {
-    var raw = localStorage.getItem(STATE_KEY)
-    return raw ? JSON.parse(raw) : {}
+    var raw = chrome.storage.local.get(STATE_KEY)
+    return new Promise(function (resolve) {
+      chrome.storage.local.get(STATE_KEY, function (result) {
+        resolve(result[STATE_KEY] || {})
+      })
+    })
   } catch (e) {
-    return {}
+    return Promise.resolve({})
   }
 }
 
 function saveState(state) {
-  localStorage.setItem(STATE_KEY, JSON.stringify(state))
+  return new Promise(function (resolve) {
+    chrome.storage.local.set(Object.assign({}, state))
+    resolve()
+  })
 }
 
 // ---- Alarms ----
@@ -113,27 +120,28 @@ function showNotification(title, body) {
 
 chrome.runtime.onMessage.addListener(function (msg) {
   if (msg.type === "APPLY_BLOCK") {
-    var state = loadState()
-    state.isBlocked = msg.isBlocked
-    state.blockedHosts = msg.blockedHosts || []
-    saveState(state)
-    updateBlockRules(state.blockedHosts)
+    ;(async function () {
+      var state = await loadState()
+      state.isBlocked = msg.isBlocked
+      state.blockedHosts = msg.blockedHosts || []
+      await saveState(state)
+      await updateBlockRules(state.blockedHosts)
 
-    // Notify all tabs
-    chrome.tabs.query({}, function (tabs) {
-      for (var i = 0; i < tabs.length; i++) {
-        if (tabs[i].id && tabs[i].url && tabs[i].url.indexOf("chrome://") !== 0) {
-          chrome.tabs.sendMessage(tabs[i].id, {
-            type: "BLOCK_UPDATE",
-            isBlocked: msg.isBlocked
-          })
+      chrome.tabs.query({}, function (tabs) {
+        for (var i = 0; i < tabs.length; i++) {
+          if (tabs[i].id && tabs[i].url && tabs[i].url.indexOf("chrome://") !== 0) {
+            chrome.tabs.sendMessage(tabs[i].id, {
+              type: "BLOCK_UPDATE",
+              isBlocked: msg.isBlocked
+            }).catch(function () {})
+          }
         }
-      }
-    })
+      })
 
-    if (msg.isBlocked) {
-      showNotification("Focus Mode Active", "Social media is now blocked.")
-    }
+      if (msg.isBlocked) {
+        showNotification("Focus Mode Active", "Social media is now blocked.")
+      }
+    })()
   }
 })
 
