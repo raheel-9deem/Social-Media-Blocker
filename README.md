@@ -155,8 +155,11 @@ Social-Media-Blocker/
 | `/login` | Login | Email/password form with Zod validation |
 | `/signup` | Signup | Name/email/password/confirm form |
 | `/onboarding` | Onboarding | 3-step flow: pick platforms → set limits → choose modes |
-| `/app` | Dashboard | Overview stats, weekly chart (Recharts), per-platform usage bars, Focus Mode, Namaz Mode, Quick Timer |
-| `/app/settings` | Settings | 4-tab shell: General, Notifications, Data, Account |
+| `/app/analytics` | Analytics | 7-day usage bars, per-platform breakdown, summary stats |
+| `/app/focus` | Focus Mode | Start/end sessions, circular countdown, platform selection, Block All |
+| `/app/namaz` | Namaz Mode | Prayer windows via Aladhan API, calculation methods, pre/post block config |
+| `/app/tracker` | Tracker | Manual platform session timer |
+| `/app/schedule` | Scheduled Blocks | Placeholder |
 
 ---
 
