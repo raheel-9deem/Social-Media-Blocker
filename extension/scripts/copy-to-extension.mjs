@@ -3,9 +3,8 @@ import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const rootDir  = resolve(__dirname, "..")
-const distDir  = resolve(rootDir, "dist")
-const extDir   = resolve(rootDir, "..", "extension")
+const extDir   = resolve(__dirname, "..")       // extension/
+const distDir  = resolve(extDir, "dist")        // extension/dist/
 
 if (!existsSync(distDir)) {
   console.error("Build output not found. Run 'npm run build' first.")
@@ -14,7 +13,7 @@ if (!existsSync(distDir)) {
 
 console.log("Copying build output to extension/ …")
 
-// Remove only old Vite build artifacts before copying fresh ones
+// Remove old Vite build artifacts (preserve extension files)
 for (const name of ["index.html", "favicon.svg", "icons.svg"]) {
   const p = resolve(extDir, name)
   if (existsSync(p)) rmSync(p)
@@ -40,8 +39,8 @@ copyRecursive(distDir, extDir)
 
 const required = ["manifest.json", "background.js", "content.js", "icons"]
 for (const file of required) {
-  const path = resolve(extDir, file)
-  console.log(`  ${existsSync(path) ? "✓" : "✗"} ${file}`)
+  const p = resolve(extDir, file)
+  console.log(`  ${existsSync(p) ? "✓" : "✗"} ${file}`)
 }
 
 console.log(`\n✔ Extension ready at: ${extDir}`)

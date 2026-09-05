@@ -9,9 +9,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  root: '.',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  build: {
+    // Output to .build-tmp, then copy script moves to root preserving extension files
+    outDir: 'dist',
+    emptyOutDir: true,
   },
 })
