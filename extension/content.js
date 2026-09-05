@@ -1,52 +1,128 @@
 // ==========================================================================
 // Content Script — injected into every page to enforce blocking rules.
-// Communicates with the popup via chrome.storage and the background SW.
+//
+// This script runs at document_start in all frames. It:
+//   1. Checks chrome.storage.local for current blocking state
+//   2. Compares the current page's hostname against blocked hosts
+//   3. If blocked, overlays a full-page "blocked" screen
+//   4. Listens for real-time updates from the background service worker
+//
+// Communication channels:
+//   - chrome.storage.local → read blocking state
+//   - chrome.storage.onChanged → react to state changes
+//   - chrome.runtime.onMessage → receive HEARTBEAT and BLOCK_UPDATE messages
+//
+// The storage key must match background.js: "mediaBlockerState"
 // ==========================================================================
 
-(function () {
-  "use strict"
+;(function () {
+  "use strict";
 
-  var blocked = false
+  // ---- Constants ----
 
-  // Listen for messages from background / popup
+  /** Storage key — must match background.js STATE_KEY */
+  var STATE_KEY = "mediaBlockerState";
+
+  /** Whether a blocking overlay is currently displayed */
+  var overlayActive = false;
+
+  // ---- Message Listener ----
+
+  /**
+   * Listen for messages from the background service worker.
+   * - HEARTBEAT: periodic ping to re-check blocking status
+   * - BLOCK_UPDATE: immediate notification that blocking state changed
+   */
   chrome.runtime.onMessage.addListener(function (msg) {
     if (msg.type === "HEARTBEAT" || msg.type === "BLOCK_UPDATE") {
-      checkBlocking()
+      checkBlocking();
     }
-  })
+  });
 
-  // Watch storage for block changes
+  // ---- Storage Change Listener ----
+
+  /**
+   * Watch for changes to the blocking state key in chrome.storage.
+   * This fires when the popup or background updates the state.
+   *
+   * BUG FIX: Previously checked `changes.isBlocked` which doesn't exist
+   * as a top-level storage key. The state is stored under "mediaBlockerState".
+   */
   chrome.storage.onChanged.addListener(function (changes) {
-    if (changes.isBlocked) {
-      checkBlocking()
+    if (changes[STATE_KEY]) {
+      checkBlocking();
     }
-  })
+  });
 
-  // Initial check
-  checkBlocking()
+  // ---- Initial Check ----
 
-  // ---- Blocking helpers ----
+  // Run immediately on injection to block before page renders
+  checkBlocking();
 
+  // ==========================================================================
+  // Blocking Logic
+  // ==========================================================================
+
+  /**
+   * Main blocking check: reads state from storage, determines if the
+   * current page's hostname matches any blocked host, and shows/hides
+   * the blocking overlay accordingly.
+   *
+   * BUG FIX: Previously read `chrome.storage.local.get(["isBlocked"])`
+   * which returns undefined because state is stored under STATE_KEY.
+   * Now correctly reads from the STATE_KEY wrapper.
+   *
+   * BUG FIX: Previously blocked ALL pages when isBlocked=true. Now only
+   * blocks pages whose hostname matches a blocked host.
+   */
   async function checkBlocking() {
     try {
-      var data = await chrome.storage.local.get(["isBlocked"])
-      var shouldBlock = !!data.isBlocked
+      var result = await chrome.storage.local.get([STATE_KEY]);
+      var state = result[STATE_KEY] || {};
+      var isBlocked = !!state.isBlocked;
+      var blockedHosts = state.blockedHosts || [];
 
-      if (shouldBlock && !blocked) {
-        applyBlock()
-      } else if (!shouldBlock && blocked) {
-        removeBlock()
+      // Determine if the current page's hostname matches any blocked host
+      var currentHost = window.location.hostname.toLowerCase();
+      var shouldBlock = false;
+
+      if (isBlocked && blockedHosts.length > 0) {
+        for (var i = 0; i < blockedHosts.length; i++) {
+          var blocked = blockedHosts[i].toLowerCase();
+          // Match exact hostname or subdomain (e.g. "www.youtube.com" matches "youtube.com")
+          if (currentHost === blocked || currentHost.endsWith("." + blocked)) {
+            shouldBlock = true;
+            break;
+          }
+        }
+      }
+
+      // Apply or remove the blocking overlay
+      if (shouldBlock && !overlayActive) {
+        applyBlock();
+      } else if (!shouldBlock && overlayActive) {
+        removeBlock();
       }
     } catch (e) {
-      // Ignore storage errors
+      // Storage may not be available (e.g. in restricted pages)
+      // Fail silently to avoid console spam
     }
   }
 
-  function applyBlock() {
-    blocked = true
+  // ==========================================================================
+  // Overlay Management
+  // ==========================================================================
 
-    var overlay = document.createElement("div")
-    overlay.id = "mediaBlockerOverlay"
+  /**
+   * Create and inject a full-page blocking overlay.
+   * Uses maximum z-index and !important on all styles to ensure it
+   * cannot be hidden by page CSS or DevTools manipulation.
+   */
+  function applyBlock() {
+    overlayActive = true;
+
+    var overlay = document.createElement("div");
+    overlay.id = "mediaBlockerOverlay";
     overlay.style.cssText = [
       "position: fixed !important",
       "inset: 0 !important",
@@ -60,7 +136,7 @@
       "color: #334155 !important",
       "text-align: center !important",
       "padding: 2rem !important",
-    ].join(";")
+    ].join(";");
 
     overlay.innerHTML = [
       "<div style='font-size: 48px; margin-bottom: 16px;'>🛡️</div>",
@@ -70,34 +146,54 @@
       "<p style='font-size: 14px; color: #64748b; max-width: 320px; line-height: 1.5;'>",
       "Focus Mode is active. Open the MediaBlocker popup to disable it.",
       "</p>",
-    ].join("")
+    ].join("");
 
+    // Inject into documentElement (available even at document_start)
     if (document.documentElement) {
-      document.documentElement.appendChild(overlay)
+      document.documentElement.appendChild(overlay);
     }
 
-    // Prevent DevTools shortcut
-    document.addEventListener("keydown", preventNav, true)
+    // Prevent navigation shortcuts that could bypass the block
+    document.addEventListener("keydown", preventNav, true);
   }
 
+  /**
+   * Remove the blocking overlay and restore normal page access.
+   */
   function removeBlock() {
-    blocked = false
-    var overlay = document.getElementById("mediaBlockerOverlay")
+    overlayActive = false;
+    var overlay = document.getElementById("mediaBlockerOverlay");
     if (overlay) {
-      overlay.remove()
+      overlay.remove();
     }
-    document.removeEventListener("keydown", preventNav, true)
+    document.removeEventListener("keydown", preventNav, true);
   }
 
+  // ==========================================================================
+  // Navigation Prevention
+  // ==========================================================================
+
+  /**
+   * Prevent keyboard shortcuts that could bypass the blocking overlay.
+   * Blocks: F5 (refresh), F12 (DevTools), Ctrl+R, Ctrl+Shift+R
+   *
+   * Note: This is a soft prevention. Determined users can still use
+   * the address bar or DevTools. The declarativeNetRequest rules in
+   * background.js provide the hard block at the network level.
+   */
   function preventNav(e) {
-    var blockedKeys = ["F5", "F12"]
-    var combo = ""
-    if (e.ctrlKey || e.metaKey) combo += "Ctrl+"
-    if (e.shiftKey) combo += "Shift+"
+    var blockedKeys = ["F5", "F12"];
+    var combo = "";
+    if (e.ctrlKey || e.metaKey) combo += "Ctrl+";
+    if (e.shiftKey) combo += "Shift+";
 
-    if (blockedKeys.indexOf(e.key) !== -1 || combo + e.key === "Ctrl+R" || combo + e.key === "Ctrl+Shift+R") {
-      e.preventDefault()
-      e.stopPropagation()
+    if (
+      blockedKeys.indexOf(e.key) !== -1 ||
+      combo + e.key === "Ctrl+R" ||
+      combo + e.key === "Ctrl+Shift+R"
+    ) {
+      e.preventDefault();
+      e.stopPropagation();
     }
   }
-})()
+})();

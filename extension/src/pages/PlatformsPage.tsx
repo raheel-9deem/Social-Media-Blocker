@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/Modal"
 import { useBlockingStore } from "@/store/blockingStore"
 import { inMemoryStorage } from "@/adapters/storage/InMemoryStorageAdapter"
 import { notificationAdapter } from "@/adapters/notifications/WebNotificationAdapter"
+import { useEngine } from "@/hooks/useEngine"
 import { reportError } from "@/lib/errors/AppError"
 import { cn } from "@/lib/utils"
 import type { Platform } from "@/core/types"
@@ -22,6 +23,7 @@ const PLATFORM_COLORS = [
 ]
 
 function PlatformsPage() {
+  const engine = useEngine()
   const blockingStore = useBlockingStore()
   const [platforms, setPlatforms] = useState<Platform[]>([])
   const [loading, setLoading] = useState(true)
@@ -30,6 +32,7 @@ function PlatformsPage() {
   const [name, setName] = useState("")
   const [category, setCategory] = useState("Social")
   const [dailyLimit, setDailyLimit] = useState(30)
+  const [hostsInput, setHostsInput] = useState("")
 
   const categories = ["Social", "Video", "News", "Gaming", "Productivity", "Other"]
 
@@ -51,6 +54,7 @@ function PlatformsPage() {
     setName("")
     setCategory("Social")
     setDailyLimit(30)
+    setHostsInput("")
     setModalOpen(true)
   }
 
@@ -59,17 +63,28 @@ function PlatformsPage() {
     setName(plat.name)
     setCategory(plat.category)
     setDailyLimit(plat.dailyLimitMinutes)
+    setHostsInput((plat.hosts || []).join(", "))
     setModalOpen(true)
   }
 
   async function handleSubmit() {
     if (!name.trim()) return
     try {
+      const parsedHosts = hostsInput
+        .split(",")
+        .map((h) => h.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, ""))
+        .filter(Boolean)
+
+      const finalHosts = parsedHosts.length > 0
+        ? parsedHosts
+        : [name.trim().toLowerCase().replace(/[^a-z0-9]/g, "") + ".com"]
+
       if (editingId) {
         const updated = await inMemoryStorage.updatePlatform(editingId, {
           name: name.trim(),
           category,
           dailyLimitMinutes: dailyLimit,
+          hosts: finalHosts,
         })
         setPlatforms((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
         notificationAdapter.notify({ title: "Platform updated", message: `${name} limit set to ${dailyLimit} min/day`, type: "success" })
@@ -78,11 +93,13 @@ function PlatformsPage() {
           name: name.trim(),
           category,
           dailyLimitMinutes: dailyLimit,
+          hosts: finalHosts,
         })
         setPlatforms((prev) => [...prev, created])
         notificationAdapter.notify({ title: "Platform added", message: `${name} is now tracked`, type: "success" })
       }
       setModalOpen(false)
+      engine.evaluate()
     } catch (e) {
       reportError(e)
       notificationAdapter.notify({ title: "Error", message: "Could not save platform", type: "error" })
@@ -94,6 +111,7 @@ function PlatformsPage() {
       const plat = platforms.find((p) => p.id === id)
       if (!plat) return
       await inMemoryStorage.updatePlatform(id, { isActive: !plat.isActive })
+      engine.evaluate()
       notificationAdapter.notify({
         title: plat.isActive ? "Platform paused" : "Platform activated",
         message: plat.name,
@@ -109,6 +127,7 @@ function PlatformsPage() {
     try {
       await inMemoryStorage.removePlatform(id)
       setPlatforms((prev) => prev.filter((p) => p.id !== id))
+      engine.evaluate()
       notificationAdapter.notify({ title: "Platform removed", message: plat?.name, type: "info" })
     } catch (e) {
       reportError(e)
@@ -229,6 +248,12 @@ function PlatformsPage() {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="e.g. X (Twitter)"
+          />
+          <Input
+            label="Domain hostnames (comma-separated)"
+            value={hostsInput}
+            onChange={(e) => setHostsInput(e.target.value)}
+            placeholder="e.g. twitter.com, x.com"
           />
           <div>
             <label className="text-sm font-medium text-slate-700 mb-1.5 block">Category</label>

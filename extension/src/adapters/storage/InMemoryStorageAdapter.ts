@@ -1,6 +1,9 @@
 // ==========================================================================
-// InMemoryStorageAdapter — complete in-memory implementation of
-// StorageAdapter, with seeded mock data for development/demo.
+// PersistentStorageAdapter — in-memory cache backed by chrome.storage.local
+// (with localStorage fallback for dev), seeded with default platforms.
+//
+// This ensures platforms, focus sessions, namaz settings, and logs
+// persist across extension popup opens and closes.
 // ==========================================================================
 
 import type {
@@ -23,15 +26,19 @@ import type {
 } from "./StorageAdapter"
 import type { LimitOverride } from "../../core/types"
 
+const STORAGE_PREFIX = "mediaBlocker_"
+
 // ---- Default data ----
 
+// Default platforms seeded on first launch.
+// Each platform includes its domain hostnames for URL-level blocking.
 const DEFAULT_PLATFORMS: Omit<Platform, "id">[] = [
-  { name: "YouTube", category: "Video", dailyLimitMinutes: 90, isActive: true },
-  { name: "Instagram", category: "Social", dailyLimitMinutes: 60, isActive: true },
-  { name: "TikTok", category: "Video", dailyLimitMinutes: 45, isActive: true },
-  { name: "Twitter / X", category: "Social", dailyLimitMinutes: 45, isActive: true },
-  { name: "Facebook", category: "Social", dailyLimitMinutes: 30, isActive: true },
-  { name: "Reddit", category: "Social", dailyLimitMinutes: 30, isActive: true },
+  { name: "YouTube", category: "Video", dailyLimitMinutes: 90, isActive: true, hosts: ["youtube.com", "www.youtube.com", "m.youtube.com"] },
+  { name: "Instagram", category: "Social", dailyLimitMinutes: 60, isActive: true, hosts: ["instagram.com", "www.instagram.com"] },
+  { name: "TikTok", category: "Video", dailyLimitMinutes: 45, isActive: true, hosts: ["tiktok.com", "www.tiktok.com"] },
+  { name: "Twitter / X", category: "Social", dailyLimitMinutes: 45, isActive: true, hosts: ["twitter.com", "x.com", "www.twitter.com"] },
+  { name: "Facebook", category: "Social", dailyLimitMinutes: 30, isActive: true, hosts: ["facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com"] },
+  { name: "Reddit", category: "Social", dailyLimitMinutes: 30, isActive: true, hosts: ["reddit.com", "www.reddit.com", "old.reddit.com"] },
 ]
 
 let profile: UserProfile = {
@@ -51,7 +58,7 @@ const limitOverrides: LimitOverride[] = []
 const usageLogs: UsageLog[] = []
 const focusSessions: FocusSession[] = []
 const scheduledBlocks: ScheduledBlock[] = []
-const namazSettings: NamazSettings | null = {
+const namazSettings: NamazSettings = {
   id: "namaz-1",
   userId: "local",
   isEnabled: false,
@@ -98,13 +105,184 @@ function seedMockLogs(): void {
   }
 }
 
-seedMockLogs()
-
 // ---- Change listeners ----
 
 const changeListeners = new Set<() => void>()
 function notify(): void {
   for (const cb of changeListeners) cb()
+}
+
+// ---- Storage persistence helpers ----
+
+function isChromeStorage(): boolean {
+  return typeof chrome !== "undefined" && !!chrome.storage?.local
+}
+
+async function persistAll(): Promise<void> {
+  const data = {
+    [`${STORAGE_PREFIX}platforms`]: platforms,
+    [`${STORAGE_PREFIX}focusSessions`]: focusSessions,
+    [`${STORAGE_PREFIX}namazSettings`]: namazSettings,
+    [`${STORAGE_PREFIX}scheduledBlocks`]: scheduledBlocks,
+    [`${STORAGE_PREFIX}usageLogs`]: usageLogs,
+    [`${STORAGE_PREFIX}profile`]: profile,
+  }
+
+  if (isChromeStorage()) {
+    try {
+      await chrome.storage.local.set(data)
+    } catch (e) {
+      console.warn("[MediaBlocker] Failed to save to chrome.storage.local:", e)
+    }
+  }
+
+  if (typeof localStorage !== "undefined") {
+    try {
+      for (const [k, v] of Object.entries(data)) {
+        localStorage.setItem(k, JSON.stringify(v))
+      }
+    } catch (e) {
+      console.warn("[MediaBlocker] Failed to save to localStorage:", e)
+    }
+  }
+}
+
+// Synchronous sync from localStorage on startup if present
+function syncFromLocalStorage(): void {
+  if (typeof localStorage === "undefined") return
+  try {
+    const p = localStorage.getItem(`${STORAGE_PREFIX}platforms`)
+    if (p) {
+      const parsed = JSON.parse(p)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        platforms.length = 0
+        platforms.push(...parsed)
+      }
+    }
+    const fs = localStorage.getItem(`${STORAGE_PREFIX}focusSessions`)
+    if (fs) {
+      const parsed = JSON.parse(fs)
+      if (Array.isArray(parsed)) {
+        focusSessions.length = 0
+        focusSessions.push(...parsed)
+      }
+    }
+    const ns = localStorage.getItem(`${STORAGE_PREFIX}namazSettings`)
+    if (ns) {
+      Object.assign(namazSettings, JSON.parse(ns))
+    }
+    const sb = localStorage.getItem(`${STORAGE_PREFIX}scheduledBlocks`)
+    if (sb) {
+      const parsed = JSON.parse(sb)
+      if (Array.isArray(parsed)) {
+        scheduledBlocks.length = 0
+        scheduledBlocks.push(...parsed)
+      }
+    }
+    const ul = localStorage.getItem(`${STORAGE_PREFIX}usageLogs`)
+    if (ul) {
+      const parsed = JSON.parse(ul)
+      if (Array.isArray(parsed)) {
+        usageLogs.length = 0
+        usageLogs.push(...parsed)
+      }
+    }
+    const pr = localStorage.getItem(`${STORAGE_PREFIX}profile`)
+    if (pr) {
+      profile = JSON.parse(pr)
+    }
+  } catch (e) {
+    console.warn("[MediaBlocker] syncFromLocalStorage error:", e)
+  }
+}
+
+// Initial sync
+syncFromLocalStorage()
+if (usageLogs.length === 0) {
+  seedMockLogs()
+}
+
+// Asynchronous hydration from chrome.storage.local
+async function hydrateFromChromeStorage(): Promise<void> {
+  if (!isChromeStorage()) return
+  try {
+    const keys = [
+      `${STORAGE_PREFIX}platforms`,
+      `${STORAGE_PREFIX}focusSessions`,
+      `${STORAGE_PREFIX}namazSettings`,
+      `${STORAGE_PREFIX}scheduledBlocks`,
+      `${STORAGE_PREFIX}usageLogs`,
+      `${STORAGE_PREFIX}profile`,
+    ]
+    const res = await chrome.storage.local.get(keys)
+    let changed = false
+
+    if (res[`${STORAGE_PREFIX}platforms`] && Array.isArray(res[`${STORAGE_PREFIX}platforms`])) {
+      platforms.length = 0
+      platforms.push(...res[`${STORAGE_PREFIX}platforms`])
+      changed = true
+    }
+    if (res[`${STORAGE_PREFIX}focusSessions`] && Array.isArray(res[`${STORAGE_PREFIX}focusSessions`])) {
+      focusSessions.length = 0
+      focusSessions.push(...res[`${STORAGE_PREFIX}focusSessions`])
+      changed = true
+    }
+    if (res[`${STORAGE_PREFIX}namazSettings`]) {
+      Object.assign(namazSettings, res[`${STORAGE_PREFIX}namazSettings`])
+      changed = true
+    }
+    if (res[`${STORAGE_PREFIX}scheduledBlocks`] && Array.isArray(res[`${STORAGE_PREFIX}scheduledBlocks`])) {
+      scheduledBlocks.length = 0
+      scheduledBlocks.push(...res[`${STORAGE_PREFIX}scheduledBlocks`])
+      changed = true
+    }
+    if (res[`${STORAGE_PREFIX}usageLogs`] && Array.isArray(res[`${STORAGE_PREFIX}usageLogs`])) {
+      usageLogs.length = 0
+      usageLogs.push(...res[`${STORAGE_PREFIX}usageLogs`])
+      changed = true
+    }
+    if (res[`${STORAGE_PREFIX}profile`]) {
+      profile = { ...res[`${STORAGE_PREFIX}profile`] }
+      changed = true
+    }
+
+    if (changed) {
+      notify()
+    }
+  } catch (e) {
+    console.warn("[MediaBlocker] hydrateFromChromeStorage error:", e)
+  }
+}
+
+void hydrateFromChromeStorage()
+
+// Listen for external storage changes (e.g. background worker or options page)
+if (isChromeStorage()) {
+  chrome.storage.onChanged.addListener((changes) => {
+    let shouldNotify = false
+    if (changes[`${STORAGE_PREFIX}platforms`]?.newValue) {
+      platforms.length = 0
+      platforms.push(...changes[`${STORAGE_PREFIX}platforms`].newValue)
+      shouldNotify = true
+    }
+    if (changes[`${STORAGE_PREFIX}focusSessions`]?.newValue) {
+      focusSessions.length = 0
+      focusSessions.push(...changes[`${STORAGE_PREFIX}focusSessions`].newValue)
+      shouldNotify = true
+    }
+    if (changes[`${STORAGE_PREFIX}namazSettings`]?.newValue) {
+      Object.assign(namazSettings, changes[`${STORAGE_PREFIX}namazSettings`].newValue)
+      shouldNotify = true
+    }
+    if (changes[`${STORAGE_PREFIX}scheduledBlocks`]?.newValue) {
+      scheduledBlocks.length = 0
+      scheduledBlocks.push(...changes[`${STORAGE_PREFIX}scheduledBlocks`].newValue)
+      shouldNotify = true
+    }
+    if (shouldNotify) {
+      notify()
+    }
+  })
 }
 
 // ---- Adapter implementation ----
@@ -116,6 +294,7 @@ export const inMemoryStorage: StorageAdapter = {
 
   async updateProfile(data: UpdateProfile): Promise<UserProfile> {
     profile = { ...profile, ...data }
+    await persistAll()
     notify()
     return { ...profile }
   },
@@ -125,8 +304,14 @@ export const inMemoryStorage: StorageAdapter = {
   },
 
   async addPlatform(data: CreatePlatform): Promise<Platform> {
-    const p: Platform = { id: crypto.randomUUID(), ...data, isActive: true }
+    const p: Platform = {
+      id: crypto.randomUUID(),
+      ...data,
+      hosts: data.hosts && data.hosts.length > 0 ? data.hosts : [data.name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com"],
+      isActive: true,
+    }
     platforms.push(p)
+    await persistAll()
     notify()
     return { ...p }
   },
@@ -135,6 +320,7 @@ export const inMemoryStorage: StorageAdapter = {
     const idx = platforms.findIndex((p) => p.id === id)
     if (idx === -1) throw new AppStorageError(`Platform ${id} not found`, "STORAGE_NOT_FOUND")
     platforms[idx] = { ...platforms[idx], ...data }
+    await persistAll()
     notify()
     return { ...platforms[idx] }
   },
@@ -143,6 +329,7 @@ export const inMemoryStorage: StorageAdapter = {
     const idx = platforms.findIndex((p) => p.id === id)
     if (idx === -1) throw new AppStorageError(`Platform ${id} not found`, "STORAGE_NOT_FOUND")
     platforms.splice(idx, 1)
+    await persistAll()
     notify()
   },
 
@@ -154,6 +341,7 @@ export const inMemoryStorage: StorageAdapter = {
       createdAt: new Date().toISOString(),
     }
     usageLogs.push(log)
+    await persistAll()
     notify()
     return { ...log }
   },
@@ -181,6 +369,7 @@ export const inMemoryStorage: StorageAdapter = {
       reason: "user_activated",
     }
     focusSessions.push(fs)
+    await persistAll()
     notify()
     return { ...fs }
   },
@@ -193,6 +382,7 @@ export const inMemoryStorage: StorageAdapter = {
       endsAt: new Date().toISOString(),
       reason: "manual_end",
     }
+    await persistAll()
     notify()
     return { ...focusSessions[idx] }
   },
@@ -214,6 +404,7 @@ export const inMemoryStorage: StorageAdapter = {
       const idx = scheduledBlocks.findIndex((b) => b.id === block.id)
       if (idx !== -1) {
         scheduledBlocks[idx] = { ...scheduledBlocks[idx], ...block }
+        await persistAll()
         notify()
         return { ...scheduledBlocks[idx] }
       }
@@ -229,6 +420,7 @@ export const inMemoryStorage: StorageAdapter = {
       isActive: block.isActive ?? true,
     }
     scheduledBlocks.push(b)
+    await persistAll()
     notify()
     return { ...b }
   },
@@ -237,6 +429,7 @@ export const inMemoryStorage: StorageAdapter = {
     const idx = scheduledBlocks.findIndex((b) => b.id === id)
     if (idx === -1) throw new AppStorageError(`Block ${id} not found`, "STORAGE_NOT_FOUND")
     scheduledBlocks.splice(idx, 1)
+    await persistAll()
     notify()
   },
 
@@ -248,6 +441,7 @@ export const inMemoryStorage: StorageAdapter = {
   async updateNamazSettings(data: UpdateNamazSettings): Promise<NamazSettings> {
     if (!namazSettings) throw new AppStorageError("Namaz settings not initialized", "STORAGE_NOT_FOUND")
     Object.assign(namazSettings, data)
+    await persistAll()
     notify()
     return { ...namazSettings }
   },

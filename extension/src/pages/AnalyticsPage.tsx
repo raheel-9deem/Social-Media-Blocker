@@ -82,9 +82,10 @@ function AnalyticsPage() {
   }, [])
 
   // ---- Trigger engine evaluation to rebuild accumulator ----
+  const evaluateEngine = engine.evaluate
   useEffect(() => {
-    engine.evaluate()
-  }, [engine])
+    evaluateEngine()
+  }, [evaluateEngine])
 
   // ---- Today's date (midnight) for accumulator queries ----
   const today = useMemo(() => {

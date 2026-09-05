@@ -24,10 +24,15 @@ function makeWindow(
 ): CoreNamazWindow {
   const [sh, sm] = [Math.floor(startMinutes / 60), startMinutes % 60]
   const [eh, em] = [Math.floor(endMinutes / 60), endMinutes % 60]
+  const start = new Date(`${dateStr}T${pad(sh)}:${pad(sm)}:00`)
+  let end = new Date(`${dateStr}T${pad(eh)}:${pad(em)}:00`)
+  if (endMinutes < startMinutes) {
+    end = new Date(end.getTime() + 24 * 60 * 60 * 1000)
+  }
   return {
     name,
-    start: new Date(`${dateStr}T${pad(sh)}:${pad(sm)}:00`),
-    end: new Date(`${dateStr}T${pad(eh)}:${pad(em)}:00`),
+    start,
+    end,
   }
 }
 
@@ -230,7 +235,7 @@ describe("NamazModeRule — engine integration", () => {
       userId: "user-1",
       userTimezone: "UTC",
       now,
-      platforms: [],
+      platforms: [{ id: "p-1", name: "YouTube", category: "Video", dailyLimitMinutes: 90, isActive: true, hosts: ["youtube.com"] }],
       dailyUsage: new Map(),
       activeFocusSessions: [],
       scheduledBlocks: [],

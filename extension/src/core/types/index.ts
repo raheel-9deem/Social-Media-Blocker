@@ -14,6 +14,12 @@ export interface Platform {
   dailyLimitMinutes: number
   /** Whether the platform is actively managed */
   isActive: boolean
+  /**
+   * Domain hostnames associated with this platform.
+   * Used by the blocking engine to map platform decisions to actual URLs.
+   * Example: ["youtube.com", "www.youtube.com", "m.youtube.com"]
+   */
+  hosts: string[]
 }
 
 /** Per-day-of-week override for a platform's limit. */

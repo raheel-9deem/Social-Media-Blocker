@@ -102,13 +102,20 @@ function NamazPage() {
   // ---- Load settings ----
   useEffect(() => {
     let cancelled = false
-    inMemoryStorage.getNamazSettings().then((s) => {
-      if (cancelled) return
-      setSettings(s)
-      setLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [engine.lastEvaluated])
+    function refresh() {
+      inMemoryStorage.getNamazSettings().then((s) => {
+        if (cancelled) return
+        setSettings(s)
+        setLoading(false)
+      }).catch(() => {})
+    }
+    refresh()
+    const unsub = inMemoryStorage.subscribeToChanges(refresh)
+    return () => {
+      cancelled = true
+      unsub()
+    }
+  }, [])
 
   // ---- Fetch prayer times when settings change ----
   useEffect(() => {
@@ -160,7 +167,7 @@ function NamazPage() {
       })
 
     return () => { cancelled = true }
-  }, [settings?.isEnabled, settings?.calculationMethod, settings?.preBlockMinutes, settings?.postBlockMinutes, detectedTz, engine])
+  }, [settings?.isEnabled, settings?.calculationMethod, settings?.preBlockMinutes, settings?.postBlockMinutes, detectedTz, engine.evaluate])
 
   // ---- Save settings ----
   const saveSettings = useCallback(async (updates: Partial<NamazSettings>) => {

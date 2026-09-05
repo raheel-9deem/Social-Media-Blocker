@@ -40,6 +40,8 @@ export interface CreatePlatform {
   category: string
   /** Minutes per day */
   dailyLimitMinutes: number
+  /** Domain hostnames for URL-level blocking (e.g. ["youtube.com"]) */
+  hosts?: string[]
 }
 
 export interface UpdatePlatform {
@@ -47,6 +49,8 @@ export interface UpdatePlatform {
   category?: string
   dailyLimitMinutes?: number
   isActive?: boolean
+  /** Domain hostnames for URL-level blocking */
+  hosts?: string[]
 }
 
 // ---- Usage ----

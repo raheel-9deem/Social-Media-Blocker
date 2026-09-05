@@ -108,7 +108,8 @@ class AladhanProvider implements PrayerTimeProvider {
       throw new Error("Invalid prayer times response from API")
     }
 
-    const dateStr = json.data?.date?.gregorian?.date ?? date.toISOString().slice(0, 10)
+    // Use local YYYY-MM-DD so ISO strings parse consistently across all browsers
+    const dateStr = `${yyyy}-${mm}-${dd}`
 
     const result: PrayerTimes = {
       Fajr: timings.Fajr,
@@ -140,10 +141,23 @@ class AladhanProvider implements PrayerTimeProvider {
       const [preH, preM] = subtractMinutes(h, m, config.preBlockMinutes)
       const [postH, postM] = addMinutes(h, m, config.postBlockMinutes)
 
+      const start = new Date(times.date + "T" + String(preH).padStart(2, "0") + ":" + String(preM).padStart(2, "0") + ":00")
+      let end = new Date(times.date + "T" + String(postH).padStart(2, "0") + ":" + String(postM).padStart(2, "0") + ":00")
+
+      // If pre-block crossed midnight backwards (e.g. Fajr 00:05 - 10m = 23:55 yesterday)
+      if (preH * 60 + preM > h * 60 + m) {
+        start.setDate(start.getDate() - 1)
+      }
+
+      // If post-block crossed midnight forwards (e.g. Isha 23:55 + 10m = 00:05 next day)
+      if (postH * 60 + postM < h * 60 + m || end <= start) {
+        end.setDate(end.getDate() + 1)
+      }
+
       return {
         prayerName: name,
-        start: new Date(times.date + "T" + String(preH).padStart(2, "0") + ":" + String(preM).padStart(2, "0") + ":00"),
-        end: new Date(times.date + "T" + String(postH).padStart(2, "0") + ":" + String(postM).padStart(2, "0") + ":00"),
+        start,
+        end,
         startStr: `${String(preH).padStart(2, "0")}:${String(preM).padStart(2, "0")}`,
         endStr: `${String(postH).padStart(2, "0")}:${String(postM).padStart(2, "0")}`,
       }
@@ -155,14 +169,14 @@ class AladhanProvider implements PrayerTimeProvider {
 
 function subtractMinutes(h: number, m: number, mins: number): [number, number] {
   const total = h * 60 + m - mins
-  if (total < 0) return [24 + Math.floor(total / 60), total % 60]
-  return [Math.floor(total / 60), total % 60]
+  const normalized = ((total % 1440) + 1440) % 1440
+  return [Math.floor(normalized / 60), normalized % 60]
 }
 
 function addMinutes(h: number, m: number, mins: number): [number, number] {
   const total = h * 60 + m + mins
-  if (total >= 24 * 60) return [Math.floor(total / 60) - 24, total % 60]
-  return [Math.floor(total / 60), total % 60]
+  const normalized = ((total % 1440) + 1440) % 1440
+  return [Math.floor(normalized / 60), normalized % 60]
 }
 
 // ---- Singleton ----

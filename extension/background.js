@@ -1,148 +1,269 @@
 // ==========================================================================
 // Background Service Worker — handles alarms, heartbeats, and
 // cross-instance messaging for the MediaBlocker extension.
+//
+// This is a Manifest V3 service worker. It has NO access to DOM or
+// `window`. It communicates with:
+//   1. Popup (React app) — via chrome.runtime.onMessage
+//   2. Content scripts   — via chrome.tabs.sendMessage
+//   3. Storage           — via chrome.storage.local
+//
+// Key responsibilities:
+//   - Periodic heartbeat alarm to keep content scripts in sync
+//   - Expiration alarms to auto-unblock when focus session ends (even if popup is closed)
+//   - State persistence (blocked status, blocked hosts, expiration)
+//   - Declarative Net Request rule management (browser-level network blocking)
+//   - Notification delivery
 // ==========================================================================
 
-var STATE_KEY = "mediaBlockerState"
+"use strict";
 
-function loadState() {
+// Storage key used for all blocking state persistence.
+// Must match the key used by content.js to read blocking status.
+const STATE_KEY = "mediaBlockerState";
+
+// ==========================================================================
+// State Management — read/write blocking state from chrome.storage.local
+// ==========================================================================
+
+/**
+ * Load the current blocking state from chrome.storage.local.
+ * Returns an object with { isBlocked, blockedHosts, expiresAt, ... } or empty object.
+ */
+async function loadState() {
   try {
-    var raw = chrome.storage.local.get(STATE_KEY)
-    return new Promise(function (resolve) {
-      chrome.storage.local.get(STATE_KEY, function (result) {
-        resolve(result[STATE_KEY] || {})
-      })
-    })
+    const result = await chrome.storage.local.get(STATE_KEY);
+    return result[STATE_KEY] || {};
   } catch (e) {
-    return Promise.resolve({})
+    console.warn("[MediaBlocker] Failed to load state:", e);
+    return {};
   }
 }
 
-function saveState(state) {
-  return new Promise(function (resolve) {
-    chrome.storage.local.set(Object.assign({}, state))
-    resolve()
-  })
+/**
+ * Save blocking state to chrome.storage.local under the STATE_KEY.
+ */
+async function saveState(state) {
+  try {
+    await chrome.storage.local.set({ [STATE_KEY]: state });
+  } catch (e) {
+    console.warn("[MediaBlocker] Failed to save state:", e);
+  }
 }
 
-// ---- Alarms ----
-
-chrome.runtime.onInstalled.addListener(function () {
-  chrome.alarms.create("heartbeat", { periodInMinutes: 1 })
-})
-
-chrome.alarms.onAlarm.addListener(function (alarm) {
-  if (alarm.name === "heartbeat") {
-    chrome.tabs.query({}, function (tabs) {
-      for (var i = 0; i < tabs.length; i++) {
-        var tab = tabs[i]
-        if (tab.id && tab.url && tab.url.indexOf("chrome://") !== 0) {
-          chrome.tabs.sendMessage(tab.id, { type: "HEARTBEAT" })
-        }
+/**
+ * Notify all open browser tabs about the updated blocking status.
+ */
+function notifyAllTabs(isBlocked, blockedHosts) {
+  chrome.tabs.query({}, function (tabs) {
+    for (const tab of tabs) {
+      // Skip chrome:// internal pages
+      if (tab.id && tab.url && !tab.url.startsWith("chrome://")) {
+        chrome.tabs.sendMessage(tab.id, {
+          type: "BLOCK_UPDATE",
+          isBlocked: isBlocked,
+          blockedHosts: blockedHosts || [],
+        }).catch(function () {
+          // Content script not loaded in this tab — safe to ignore
+        });
       }
-    })
-  }
-})
+    }
+  });
+}
 
-// ---- Messages ----
+// ==========================================================================
+// Alarms — heartbeat and session auto-unblock
+// ==========================================================================
+
+/**
+ * On install/update, create a recurring 1-minute heartbeat alarm.
+ */
+chrome.runtime.onInstalled.addListener(function () {
+  chrome.alarms.create("heartbeat", { periodInMinutes: 1 });
+  console.log("[MediaBlocker] Extension installed, heartbeat alarm created");
+});
+
+/**
+ * Alarm listener:
+ * 1. "focus_end": fires when a focus session's countdown expires while popup is closed.
+ * 2. "heartbeat": periodic check to ping tabs and verify expiration.
+ */
+chrome.alarms.onAlarm.addListener(async function (alarm) {
+  if (alarm.name === "focus_end") {
+    console.log("[MediaBlocker] Focus session expired via alarm. Unblocking...");
+    const state = await loadState();
+    state.isBlocked = false;
+    state.blockedHosts = [];
+    state.expiresAt = null;
+    await saveState(state);
+    await updateBlockRules([]);
+    notifyAllTabs(false, []);
+    showNotification("Focus Mode Finished", "Your focus session has ended. Websites are now unblocked.");
+  } else if (alarm.name === "heartbeat") {
+    const state = await loadState();
+
+    // Check if a timed block expired while background was sleeping
+    if (state.isBlocked && state.expiresAt && Date.now() >= state.expiresAt) {
+      console.log("[MediaBlocker] Expired session caught during heartbeat. Unblocking...");
+      state.isBlocked = false;
+      state.blockedHosts = [];
+      state.expiresAt = null;
+      await saveState(state);
+      await updateBlockRules([]);
+      notifyAllTabs(false, []);
+      showNotification("Focus Mode Finished", "Your focus session has ended. Websites are now unblocked.");
+    } else {
+      // Ping tabs to keep them in sync
+      chrome.tabs.query({}, function (tabs) {
+        for (const tab of tabs) {
+          if (tab.id && tab.url && !tab.url.startsWith("chrome://")) {
+            chrome.tabs.sendMessage(tab.id, { type: "HEARTBEAT" }).catch(function () {
+              // Tab may not have content script loaded — ignore
+            });
+          }
+        }
+      });
+    }
+  }
+});
+
+// ==========================================================================
+// Message Handling — single unified listener for all message types
+// ==========================================================================
 
 chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
-  ;(async function () {
+  (async function () {
     try {
       switch (msg.type) {
+
+        // ---- State Management (used by popup for sync) ----
         case "GET_STATE": {
-          var result = await chrome.storage.local.get(STATE_KEY)
-          sendResponse(result[STATE_KEY] || {})
-          break
+          const result = await chrome.storage.local.get(STATE_KEY);
+          sendResponse(result[STATE_KEY] || {});
+          break;
         }
+
         case "SET_STATE": {
-          var current = (await chrome.storage.local.get(STATE_KEY))[STATE_KEY] || {}
-          saveState(Object.assign({}, current, msg.payload))
-          sendResponse({ ok: true })
-          break
+          const current = await loadState();
+          const updated = Object.assign({}, current, msg.payload);
+          await saveState(updated);
+          sendResponse({ ok: true });
+          break;
         }
+
+        // ---- URL-level blocking via declarativeNetRequest ----
         case "BLOCK_URLS": {
-          await updateBlockRules(msg.urls || [])
-          sendResponse({ ok: true })
-          break
+          await updateBlockRules(msg.urls || []);
+          sendResponse({ ok: true });
+          break;
         }
+
+        // ---- Bridge: popup sends blocking decisions to content scripts ----
+        case "APPLY_BLOCK": {
+          const state = await loadState();
+          state.isBlocked = !!msg.isBlocked;
+          state.blockedHosts = msg.blockedHosts || [];
+          state.expiresAt = msg.expiresAt || null;
+          await saveState(state);
+
+          // Update declarativeNetRequest rules for URL-level blocking
+          await updateBlockRules(state.blockedHosts);
+
+          // Set alarm to auto-unblock when session ends
+          if (msg.isBlocked && msg.expiresAt && msg.expiresAt > Date.now()) {
+            chrome.alarms.create("focus_end", { when: msg.expiresAt });
+          } else {
+            chrome.alarms.clear("focus_end");
+          }
+
+          // Notify all content scripts about the new blocking status
+          notifyAllTabs(state.isBlocked, state.blockedHosts);
+
+          // Show a system notification when blocking activates
+          if (msg.isBlocked) {
+            showNotification("Focus Mode Active", "Distracting websites are now blocked.");
+          }
+
+          sendResponse({ ok: true });
+          break;
+        }
+
         default:
-          sendResponse({ error: "Unknown message type" })
+          sendResponse({ error: "Unknown message type: " + msg.type });
       }
     } catch (err) {
-      sendResponse({ error: err.message })
+      console.error("[MediaBlocker] Message handler error:", err);
+      sendResponse({ error: err.message });
     }
-  })()
+  })();
 
-  return true
-})
+  // Return true to indicate we will respond asynchronously
+  return true;
+});
 
-// ---- Declarative Net Request (block list) ----
+// ==========================================================================
+// Declarative Net Request — URL-level blocking via Chrome's built-in engine
+// ==========================================================================
 
-async function updateBlockRules(urls) {
+/**
+ * Update the dynamic blocking rules to match the given hostname list.
+ *
+ * @param {string[]} hosts - Array of hostnames to block (e.g. ["youtube.com", "instagram.com"])
+ */
+async function updateBlockRules(hosts) {
   try {
-    var rules = []
-    for (var i = 0; i < urls.length; i++) {
+    if (!chrome.declarativeNetRequest) return;
+
+    // Build new rules — one per hostname
+    const rules = [];
+    for (let i = 0; i < hosts.length; i++) {
       rules.push({
         id: i + 1,
         priority: 1,
         action: { type: "block" },
         condition: {
-          urlFilter: "*://" + urls[i] + "/*",
-          resourceTypes: [1]
-        }
-      })
+          urlFilter: "*://" + hosts[i] + "/*",
+          resourceTypes: ["main_frame", "sub_frame"],
+        },
+      });
     }
 
-    var existing = await chrome.declarativeNetRequest.getDynamicRules()
-    var removeRuleIds = existing.map(function (r) { return r.id })
+    // Remove all existing dynamic rules first, then add new ones
+    const existing = await chrome.declarativeNetRequest.getDynamicRules();
+    const removeRuleIds = existing.map(function (r) { return r.id; });
+
     await chrome.declarativeNetRequest.updateDynamicRules({
       removeRuleIds: removeRuleIds,
-      addRules: rules
-    })
+      addRules: rules,
+    });
+
+    console.log("[MediaBlocker] Updated DNR block rules:", hosts.length, "hosts");
   } catch (e) {
-    // DNR API may not be available; fallback handled by content script
+    console.warn("[MediaBlocker] DNR update failed (fallback to content script):", e);
   }
 }
 
-// ---- Notifications ----
+// ==========================================================================
+// Notifications — system-level alerts via chrome.notifications API
+// ==========================================================================
 
+/**
+ * Show a Chrome notification with the extension icon.
+ * @param {string} title - Notification title
+ * @param {string} body  - Notification body text
+ */
 function showNotification(title, body) {
-  chrome.notifications.create("mediaBlocker-" + Date.now(), {
-    type: "basic",
-    iconUrl: "icons/icon-128.png",
-    title: title,
-    message: body
-  })
+  try {
+    if (!chrome.notifications) return;
+    chrome.notifications.create("mediaBlocker-" + Date.now(), {
+      type: "basic",
+      iconUrl: "icons/icon-128.png",
+      title: title,
+      message: body,
+    });
+  } catch (e) {
+    console.warn("[MediaBlocker] Notification failed:", e);
+  }
 }
 
-// ---- Listen for block changes from popup ----
-
-chrome.runtime.onMessage.addListener(function (msg) {
-  if (msg.type === "APPLY_BLOCK") {
-    ;(async function () {
-      var state = await loadState()
-      state.isBlocked = msg.isBlocked
-      state.blockedHosts = msg.blockedHosts || []
-      await saveState(state)
-      await updateBlockRules(state.blockedHosts)
-
-      chrome.tabs.query({}, function (tabs) {
-        for (var i = 0; i < tabs.length; i++) {
-          if (tabs[i].id && tabs[i].url && tabs[i].url.indexOf("chrome://") !== 0) {
-            chrome.tabs.sendMessage(tabs[i].id, {
-              type: "BLOCK_UPDATE",
-              isBlocked: msg.isBlocked
-            }).catch(function () {})
-          }
-        }
-      })
-
-      if (msg.isBlocked) {
-        showNotification("Focus Mode Active", "Social media is now blocked.")
-      }
-    })()
-  }
-})
-
-console.log("[MediaBlocker] Background service worker started")
+console.log("[MediaBlocker] Background service worker started");

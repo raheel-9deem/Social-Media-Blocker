@@ -1,4 +1,22 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
+// ==========================================================================
+// App — Root component of the MediaBlocker popup UI.
+//
+// Uses HashRouter (not BrowserRouter) because Chrome extension popups
+// run at chrome-extension://ID/index.html and don't have a real web
+// server to handle pushState navigation. HashRouter uses URL hashes
+// (e.g. #/app/platforms) which work correctly in the extension context.
+//
+// Route structure:
+//   #/app           → Dashboard (default)
+//   #/app/platforms → Manage tracked platforms
+//   #/app/tracker   → Usage tracking
+//   #/app/focus     → Focus Mode sessions
+//   #/app/analytics → Usage analytics
+//   #/app/namaz     → Namaz Mode settings
+//   #/app/settings  → App settings
+// ==========================================================================
+
+import { HashRouter, Routes, Route, Navigate } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "sonner"
 import AppLayout from "@/components/layout/AppLayout"
@@ -11,6 +29,12 @@ import AnalyticsPage from "@/pages/AnalyticsPage"
 import NamazPage from "@/pages/NamazPage"
 import { ErrorBoundary } from "@/components/ui/Spinner"
 
+/**
+ * React Query client with sensible defaults for an offline-first extension:
+ * - No refetch on window focus (popup opens/closes frequently)
+ * - No retries (data is local, failures are immediate)
+ * - 5-minute stale time to avoid unnecessary re-fetches
+ */
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -21,6 +45,10 @@ const queryClient = new QueryClient({
   },
 })
 
+/**
+ * Placeholder route component for features not yet implemented.
+ * Shows a simple message instead of an empty page.
+ */
 function PlaceholderRoute({ title }: { title: string }) {
   return (
     <div className="p-8 max-w-2xl mx-auto">
@@ -32,13 +60,21 @@ function PlaceholderRoute({ title }: { title: string }) {
   )
 }
 
+/**
+ * Root App component — wraps everything in providers and routing.
+ *
+ * BUG FIX: Changed from BrowserRouter to HashRouter. BrowserRouter uses
+ * the History API which doesn't work in Chrome extension popup context
+ * (no server to handle pushState). HashRouter uses URL fragments (#/path)
+ * which work correctly everywhere.
+ */
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <HashRouter>
         <ErrorBoundary>
           <Routes>
-            {/* App shell — no auth needed */}
+            {/* App shell — all authenticated routes */}
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
               <Route path="platforms" element={<PlatformsPage />} />
@@ -51,6 +87,7 @@ export default function App() {
               />
               <Route path="namaz" element={<NamazPage />} />
               <Route path="settings" element={<SettingsShell />} />
+              {/* Catch-all within /app → redirect to dashboard */}
               <Route
                 path="*"
                 element={<Navigate to="/app" replace />}
@@ -58,10 +95,12 @@ export default function App() {
             </Route>
             {/* Root → Dashboard */}
             <Route path="/" element={<Navigate to="/app" replace />} />
+            {/* Global catch-all → Dashboard */}
             <Route path="*" element={<Navigate to="/app" replace />} />
           </Routes>
         </ErrorBoundary>
-      </BrowserRouter>
+      </HashRouter>
+      {/* Toast notifications at the bottom of the popup */}
       <Toaster
         position="bottom-center"
         toastOptions={{

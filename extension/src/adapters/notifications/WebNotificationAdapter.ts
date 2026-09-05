@@ -20,7 +20,8 @@ export interface NotificationPayload {
  * when permission is granted.
  */
 export class WebNotificationAdapter {
-  private permission = "Notification" in window ? Notification.permission : "denied"
+  // Guard: window may not exist in service worker context
+  private permission = (typeof window !== "undefined" && "Notification" in window) ? Notification.permission : "denied"
 
   /**
    * Send an in-app toast notification.

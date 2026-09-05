@@ -66,11 +66,12 @@ function DashboardPageInner() {
   }, [timerStore.sessions, timerStore])
 
   // ---- Periodic engine evaluation ----
+  const evaluateEngine = engine.evaluate
   useEffect(() => {
-    engine.evaluate()
-    const id = setInterval(() => engine.evaluate(), 10_000)
+    evaluateEngine()
+    const id = setInterval(() => evaluateEngine(), 10_000)
     return () => clearInterval(id)
-  }, [engine])
+  }, [evaluateEngine])
 
   // ---- Focus active state (polls storage) ----
   useEffect(() => {

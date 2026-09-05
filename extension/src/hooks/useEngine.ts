@@ -191,9 +191,9 @@ export function useEngine(): EngineState {
     }
   }, [])
 
-  // Track pending sends to avoid duplicate APPLY_BLOCK messages
-  var pendingSentRef = useRef<Set<string>>(new Set())
-  pendingSentRef.current = pendingSentRef.current // stabilize reference for deps
+  // Track the last sent blocking key to avoid duplicate APPLY_BLOCK messages.
+  // Using a ref (not state) because we don't want re-renders when it changes.
+  const lastSentKeyRef = useRef<string>("")
 
   const evaluate = useCallback(async (): Promise<EvaluationResult> => {
     try {
@@ -248,21 +248,43 @@ export function useEngine(): EngineState {
       setLastEvaluated(now)
 
       // ---- Bridge: sync blocking decisions to background service worker ----
-      var blockedPids: string[] = []
-      for (var bd = result.decisions.entries(), entry; !(entry = bd.next()).done;) {
-        var bp = entry.value[0]
-        var bd2 = entry.value[1]
-        if (bd2.isBlocked) blockedPids.push(bp)
+      // BUG FIX: Previously sent platform IDs (UUIDs) as blockedHosts.
+      // Content script and declarativeNetRequest need actual domain hostnames.
+      // Now we collect all hosts from blocked platforms.
+      const blockedHosts: string[] = []
+      for (const [pid, decision] of result.decisions) {
+        if (decision.isBlocked) {
+          const platform = plats.find(p => p.id === pid)
+          if (platform?.hosts) {
+            blockedHosts.push(...platform.hosts)
+          }
+        }
       }
-      var bkey = blockedPids.sort().join(",")
-      if (!pendingSentRef.current.has(bkey)) {
-        pendingSentRef.current.add(bkey)
+
+      // Find earliest unblock timestamp (e.g. Focus session endsAt)
+      let minUnblockAt: number | null = null
+      for (const [, decision] of result.decisions) {
+        if (decision.isBlocked && decision.unblockAt) {
+          const t = new Date(decision.unblockAt).getTime()
+          if (!isNaN(t) && (!minUnblockAt || t < minUnblockAt)) {
+            minUnblockAt = t
+          }
+        }
+      }
+
+      // Deduplicate: only send APPLY_BLOCK if the blocked hosts list or expiration changed
+      const newKey = `${blockedHosts.sort().join(",")}|${minUnblockAt || 0}`
+      if (newKey !== lastSentKeyRef.current) {
+        lastSentKeyRef.current = newKey
         if (typeof chrome !== "undefined" && chrome.runtime && chrome.runtime.sendMessage) {
           chrome.runtime.sendMessage({
             type: "APPLY_BLOCK",
-            isBlocked: blockedPids.length > 0,
-            blockedHosts: blockedPids,
-          }).catch(function () {})
+            isBlocked: blockedHosts.length > 0,
+            blockedHosts: blockedHosts,
+            expiresAt: minUnblockAt,
+          }).catch(function () {
+            // Extension context may not be available (dev mode)
+          })
         }
       }
 
@@ -271,14 +293,14 @@ export function useEngine(): EngineState {
       reportError(e)
       return { decisions: new Map(), hasAnyBlock: false }
     }
-  }, [evaluator, resetManager, setAllBlocks]) // pendingSentRef is a stable ref
+  }, [evaluator, resetManager, setAllBlocks])
 
   const ingestLogs = useCallback(async () => {
     const logs = await inMemoryStorage.getUsageLogs(new Date(0), new Date())
     accumulatorRef.current.ingest(profile.id, logs)
   }, [])
 
-  return {
+  return useMemo(() => ({
     evaluator,
     accumulator: accumulatorRef.current,
     resetManager,
@@ -286,5 +308,5 @@ export function useEngine(): EngineState {
     evaluate,
     ingestLogs,
     lastEvaluated,
-  }
+  }), [evaluator, resetManager, evaluate, ingestLogs, lastEvaluated])
 }

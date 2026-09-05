@@ -19,7 +19,15 @@ export class NamazModeRule implements Rule {
     if (!ctx.namazWindows || ctx.namazWindows.length === 0) return NOT_BLOCKED
 
     for (const window of ctx.namazWindows) {
-      if (ctx.now >= window.start && ctx.now < window.end) {
+      const start = window.start
+      const end = window.end
+
+      // Standard window (start < end) vs window crossing midnight (end <= start)
+      const isInside = end > start
+        ? (ctx.now >= start && ctx.now < end)
+        : (ctx.now >= start || ctx.now < end)
+
+      if (isInside) {
         return {
           isBlocked: true,
           reason: {
