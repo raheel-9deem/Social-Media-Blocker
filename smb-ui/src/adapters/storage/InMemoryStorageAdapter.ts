@@ -35,8 +35,8 @@ const DEFAULT_PLATFORMS: Omit<Platform, "id">[] = [
 ]
 
 let profile: UserProfile = {
-  id: "user-1",
-  displayName: "Sam N.",
+  id: "local",
+  displayName: null,
   timezone: "Asia/Karachi",
   locale: "en",
   theme: "system",
@@ -53,7 +53,7 @@ const focusSessions: FocusSession[] = []
 const scheduledBlocks: ScheduledBlock[] = []
 const namazSettings: NamazSettings | null = {
   id: "namaz-1",
-  userId: "user-1",
+  userId: "local",
   isEnabled: false,
   calculationMethod: "MWL",
   timeFormat: "12h",

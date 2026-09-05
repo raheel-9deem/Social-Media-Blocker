@@ -5,7 +5,6 @@ import {
   Clock,
   Settings,
   Shield,
-  LogOut,
   Moon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -63,14 +62,6 @@ function Sidebar({ collapsed }: { collapsed: boolean }) {
           </NavLink>
         ))}
       </nav>
-
-      {/* Footer */}
-      <div className="border-t border-slate-100 p-2">
-        <NavLink to="/login" className={linkClass}>
-          <LogOut className="h-4 w-4 shrink-0" />
-          {!collapsed && <span>Log out</span>}
-        </NavLink>
-      </div>
     </aside>
   )
 }

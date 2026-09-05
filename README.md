@@ -1,8 +1,8 @@
 # Social Media Blocker
 
-A calm, minimal, and modern digital-wellbeing web app that helps you set healthy boundaries with social media. Built with a clean separation between core domain logic and platform-specific UI — ready to expand into a browser extension, desktop app, or mobile app.
+A calm, minimal, and modern digital-wellbeing Chrome extension. Install it from GitHub in 30 seconds — no account, no database, no setup required.
 
-> **Status:** MVP — UI foundation + core usage/limit engine complete
+> **Status:** MVP — Standalone Chrome extension with Focus Mode, Namaz Mode, and Analytics
 
 ---
 
@@ -29,57 +29,60 @@ YouTube, Instagram, TikTok, Twitter / X, Facebook, Reddit
 | **Frontend Framework** | React 19 + TypeScript 6 |
 | **Build Tool** | Vite 8 |
 | **Styling** | Tailwind CSS 4 |
-| **State Management** | Zustand 5 (UI state) + TanStack Query 5 (server state) |
+| **State Management** | Zustand 5 |
 | **Routing** | React Router 7 |
 | **Charts** | Recharts |
 | **Notifications** | Sonner |
 | **Date/Time** | date-fns |
 | **Validation** | Zod |
 | **Linting** | Oxlint |
-| **Future Backend** | Supabase (auth, Postgres, edge functions) |
 
 ---
 
 ## Architecture
 
-The codebase follows a strict layered architecture:
+The extension is fully self-contained — no server, no database, no account system. All data lives in the browser's memory during a session.
 
 ```
-src/
-├── core/                    # Platform-independent domain logic (no React/Supabase imports)
-│   ├── types/               # Shared TypeScript interfaces
-│   ├── engine/              # BlockingEvaluator, UsageAccumulator, DailyResetManager
-│   └── engine/rules/        # DailyLimitRule, FocusModeRule, ScheduledBlockRule, NamazModeRule
+Social-Media-Blocker/
+├── extension/                  # Chrome extension (load this folder in chrome://extensions)
+│   ├── manifest.json           # Manifest V3
+│   ├── background.js           # Service worker (heartbeat, state, blocking rules)
+│   ├── content.js              # Content script — injects block overlay into pages
+│   ├── icons/                  # Extension icons (16/48/128)
+│   └── index.html              # Popup (auto-copied from smb-ui/dist/)
 │
-├── components/
-│   └── ui/                  # Reusable design system (Button, Card, Input, Modal, Toggle, …)
-│
-├── components/layout/       # Sidebar, Header, AppLayout (responsive shell)
-│
-├── pages/                   # Route-level pages (Landing, Login, Dashboard, Settings, …)
-│
-├── store/                   # Zustand stores (app UI state, timer, blocking)
-│
-├── hooks/                   # Custom hooks (useMediaQuery, useIsMobile, useInterval)
-│
-├── lib/                     # Utilities (cn(), design tokens)
-│
-└── App.tsx                  # Root component with routing
+└── smb-ui/                     # React frontend application
+    ├── index.html
+    ├── package.json
+    ├── vite.config.ts          # Vite config with path aliases (@/ → src/)
+    ├── tsconfig.app.json       # TypeScript config with path mapping
+    ├── scripts/                # Build helpers (copy-to-extension, generate-icons)
+    └── src/
+        ├── main.tsx            # Entry point
+        ├── App.tsx             # Root component + routing
+        ├── index.css           # Tailwind v4 + design tokens + animations
+        ├── core/               # Platform-independent domain engine
+        ├── components/         # UI components + layout shell
+        ├── pages/              # Route-level page components
+        ├── store/              # Zustand state stores
+        ├── hooks/              # Custom React hooks
+        └── lib/                # Utility functions + design tokens
 ```
 
 ### Core Domain Layer (`src/core/`)
 
-The heart of the system. Zero dependencies on React, Supabase, or any browser/Node API. Designed to be shared as-is when building a browser extension.
+The heart of the system. Zero dependencies on React or any browser/Node API. Designed to be shared as-is when building a browser extension.
 
 | Module | Responsibility |
 |---|---|
 | `BlockingEvaluator` | Orchestrates all rules in priority order → returns per-platform `BlockingDecision` |
-| `DailyLimitRule` | Checks if a platform exceeded its daily time budget (with per-day-of-week overrides) |
+| `DailyLimitRule` | Checks if a platform exceeded its daily time budget |
 | `FocusModeRule` | Blocks platforms during active Focus sessions |
 | `ScheduledBlockRule` | Blocks during user-defined time windows (supports midnight-crossing) |
 | `NamazModeRule` | Blocks during prayer windows |
-| `UsageAccumulator` | Aggregates usage logs into per-platform per-day minute totals. Duplicate-safe |
-| `DailyResetManager` | Timezone-aware day boundary detection using `Intl.DateTimeFormat` |
+| `UsageAccumulator` | Aggregates usage logs into per-platform per-day minute totals |
+| `DailyResetManager` | Timezone-aware day boundary detection |
 
 ### Blocking Priority Chain
 
@@ -99,7 +102,7 @@ First match wins. When multiple rules fire, the highest-priority one governs whe
 - Node.js >= 18
 - npm >= 9
 
-### Install & Run
+### Install & Run (Development)
 
 ```bash
 cd smb-ui
@@ -107,9 +110,9 @@ npm install
 npm run dev
 ```
 
-The app starts at `http://localhost:5173/`.
+The app opens at `http://localhost:5173/`.
 
-### Load as Chrome Extension
+### Build as Chrome Extension
 
 ```bash
 npm run build:extension
@@ -166,16 +169,15 @@ Social-Media-Blocker/
 
 ## Routes
 
-| Route | Page | Status |
+| Route | Page | Description |
 |---|---|---|
-| `/` | Landing | Hero, features grid, CTA |
-| `/login` | Login | Email/password form with Zod validation |
-| `/signup` | Signup | Name/email/password/confirm form |
-| `/onboarding` | Onboarding | 3-step flow: pick platforms → set limits → choose modes |
+| `/app` | Dashboard | Overview: usage stats, weekly chart, Focus/Namaz widgets |
 | `/app/analytics` | Analytics | 7-day usage bars, per-platform breakdown, summary stats |
-| `/app/focus` | Focus Mode | Start/end sessions, circular countdown, platform selection, Block All |
-| `/app/namaz` | Namaz Mode | Prayer windows via Aladhan API, calculation methods, pre/post block config |
+| `/app/focus` | Focus Mode | Start/end sessions, circular countdown, platform selection |
+| `/app/namaz` | Namaz Mode | Prayer times, block windows, calculation methods |
 | `/app/tracker` | Tracker | Manual platform session timer |
+| `/app/platforms` | Platforms | Manage platforms and daily limits |
+| `/app/settings` | Settings | General preferences, notifications, data management |
 | `/app/schedule` | Scheduled Blocks | Placeholder |
 
 ---
@@ -229,27 +231,37 @@ Full schema with RLS policies is defined in `ARCHITECTURE.md`.
 
 ## Roadmap
 
+### Additional context
+
+- Standalone Chrome extension — no account, no auth, no backend
+- Data is in-memory during a session (resets when browser restarts)
+- All core logic in `src/core/` — platform-independent
+
+> [!NOTE]
+> When the manifest says **Version 2**, remove the explicit version and use `"manifest_version": 3`. When it says **Manifest V3**, the manifest is already correct.
+> Double-check the extension copy: if there is no value, delete that section. The extension is fully self-contained — just load the `extension/` folder.
+
 ### Done
 - [x] Project scaffolding (Vite + React + TypeScript)
 - [x] Design system (tokens, CSS, reusable components)
 - [x] Responsive layout shell (sidebar, header, mobile nav)
-- [x] All pages and routing (Landing, Login, Signup, Onboarding, Dashboard, Settings)
+- [x] All pages and routing (Dashboard, Analytics, Focus, Namaz, Tracker, Settings)
 - [x] Zustand stores for app UI, timer, and blocking state
 - [x] Core domain engine (platform-independent)
 - [x] UsageAccumulator, DailyResetManager, BlockingEvaluator
 - [x] All 4 blocking rules (DailyLimit, FocusMode, ScheduledBlock, NamazMode)
+- [x] Chrome extension infrastructure (manifest, background service worker, content script)
+- [x] Extension build pipeline (`npm run build:extension`)
+- [x] Account system removed — fully self-contained, no auth needed
 - [x] TypeScript + lint checks passing (0 errors)
 
 ### Next Up
-- [ ] Supabase integration (auth, database, RLS)
-- [ ] Adapter layer (storage, tracking, notifications, auth)
-- [ ] Real usage tracking + persistence
-- [ ] Analytics charts (7-day bars, per-platform breakdown)
+- [ ] Persist data to chrome.storage.local (survive browser restarts)
+- [ ] Auto-detect active social media tabs via webNavigation API
+- [ ] Real usage tracking from browser history
 - [ ] Platform management CRUD
-- [ ] Focus Mode full implementation (start/end, timer)
-- [ ] Namaz Mode full implementation (prayer times, windows)
 - [ ] Scheduled Blocks CRUD
-- [ ] Browser extension core consumption
+- [ ] Analytics charts (7-day bars, per-platform breakdown)
 
 ---
 

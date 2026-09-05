@@ -1,18 +1,16 @@
 import { useState } from "react"
-import { Bell, Shield, User, Trash2 } from "lucide-react"
+import { Bell, Shield, User } from "lucide-react"
 import { Card } from "@/components/ui/Card"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Toggle } from "@/components/ui/Toggle"
-import { Badge } from "@/components/ui/Badge"
 
-type Tab = "general" | "notifications" | "data" | "account"
+type Tab = "general" | "notifications" | "data"
 
 const TABS: { id: Tab; label: string; icon: any }[] = [
   { id: "general", label: "General", icon: User },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "data", label: "Data", icon: Shield },
-  { id: "account", label: "Account", icon: Trash2 },
 ]
 
 function SettingsShell() {
@@ -22,7 +20,7 @@ function SettingsShell() {
     <div className="p-4 lg:p-8 max-w-4xl mx-auto">
       <h2 className="text-xl font-bold text-slate-900 mb-1">Settings</h2>
       <p className="text-sm text-slate-500 mb-6">
-        Manage your preferences, notifications, and account
+        Manage your preferences, notifications, and data
       </p>
 
       <div className="flex flex-col sm:flex-row gap-6">
@@ -48,7 +46,6 @@ function SettingsShell() {
           {tab === "general" && <GeneralSettings />}
           {tab === "notifications" && <NotificationSettings />}
           {tab === "data" && <DataSettings />}
-          {tab === "account" && <AccountSettings />}
         </div>
       </div>
     </div>
@@ -180,27 +177,5 @@ function DataSettings() {
   )
 }
 
-function AccountSettings() {
-  return (
-    <Card>
-      <Card.Header>
-        <Card.Title>Account</Card.Title>
-        <Card.Description>Manage your account and subscription</Card.Description>
-      </Card.Header>
-      <Card.Content className="space-y-4">
-        <Input label="Email" type="email" value="user@example.com" readOnly />
-        <Badge variant="brand">Free Plan</Badge>
-        <p className="text-xs text-slate-400">
-          MediaBlocker is free forever. No paid tiers planned for the near future.
-        </p>
-      </Card.Content>
-      <Card.Footer>
-        <Button variant="danger" size="sm">
-          Delete Account
-        </Button>
-      </Card.Footer>
-    </Card>
-  )
-}
 
 export default SettingsShell

@@ -1,10 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { Toaster } from "sonner"
-import LandingPage from "@/pages/LandingPage"
-import LoginPage from "@/pages/LoginPage"
-import SignupPage from "@/pages/SignupPage"
-import OnboardingPage from "@/pages/OnboardingPage"
 import AppLayout from "@/components/layout/AppLayout"
 import DashboardPage from "@/pages/DashboardPage"
 import SettingsShell from "@/pages/SettingsShell"
@@ -42,12 +38,7 @@ export default function App() {
       <BrowserRouter>
         <ErrorBoundary>
           <Routes>
-            {/* Public */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/signup" element={<SignupPage />} />
-            <Route path="/onboarding" element={<OnboardingPage />} />
-            {/* Protected (App shell) */}
+            {/* App shell — no auth needed */}
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
               <Route path="platforms" element={<PlatformsPage />} />
@@ -65,7 +56,9 @@ export default function App() {
                 element={<Navigate to="/app" replace />}
               />
             </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Root → Dashboard */}
+            <Route path="/" element={<Navigate to="/app" replace />} />
+            <Route path="*" element={<Navigate to="/app" replace />} />
           </Routes>
         </ErrorBoundary>
       </BrowserRouter>

@@ -26,7 +26,7 @@ function Header({
       )}
       <div className="ml-auto flex items-center gap-2">
         <div className="h-8 w-8 rounded-full bg-brand-100 flex items-center justify-center text-xs font-bold text-brand-700">
-          SN
+          MB
         </div>
       </div>
     </header>
