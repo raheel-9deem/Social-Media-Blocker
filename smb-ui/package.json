@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:extension": "npm run build && node scripts/copy-to-extension.mjs",
     "lint": "oxlint",
     "preview": "vite preview"
   },

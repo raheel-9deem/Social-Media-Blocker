@@ -5,7 +5,7 @@
 
 import { describe, it, expect, beforeEach } from "vitest"
 import { getPrayerTimeProvider } from "@/core/services/PrayerTimeProvider"
-import { NamazModeRule, NOT_BLOCKED } from "@/core/engine/rules/Rule"
+import { NamazModeRule } from "@/core/engine/rules/NamazModeRule"
 import { inMemoryStorage } from "@/adapters/storage/InMemoryStorageAdapter"
 import type { NamazSettings } from "@/adapters/storage/StorageAdapter"
 import { BlockingEvaluator } from "@/core/engine/BlockingEvaluator"
@@ -62,6 +62,9 @@ describe("PrayerWindow computation", () => {
 
   const sampleTimes = {
     date: "2025-06-15",
+    latitude: 24.86,
+    longitude: 67.01,
+    method: "MWL",
     Fajr: "03:45",
     Dhuhr: "12:30",
     Asr: "16:15",
@@ -116,8 +119,9 @@ describe("PrayerWindow computation", () => {
   it("handles Isha window crossing midnight (Isha + postBlock extends past midnight)", () => {
     // Simulate late Isha with 30m postBlock at 23:30 → endStr = 00:00 next day
     const lateIsha = {
+      date: "2025-06-15", latitude: 24.86, longitude: 67.01, method: "MWL",
       Fajr: "03:45", Dhuhr: "12:30", Asr: "16:15", Maghrib: "19:45",
-      Isha: "23:30", date: "2025-06-15",
+      Isha: "23:30",
     }
     const windows = provider.computeWindows(lateIsha, { preBlockMinutes: 5, postBlockMinutes: 30 })
     const isha = windows.find((w) => w.prayerName === "Isha")
@@ -129,8 +133,9 @@ describe("PrayerWindow computation", () => {
   it("handles Fajr pre-block crossing midnight from previous day", () => {
     // Fajr at 03:00 with 30m preBlock → startStr = 02:30
     const earlyFajr = {
+      date: "2025-06-15", latitude: 24.86, longitude: 67.01, method: "MWL",
       Fajr: "03:00", Dhuhr: "12:30", Asr: "16:15", Maghrib: "19:45",
-      Isha: "21:00", date: "2025-06-15",
+      Isha: "21:00",
     }
     const windows = provider.computeWindows(earlyFajr, { preBlockMinutes: 30, postBlockMinutes: 5 })
     const fajr = windows.find((w) => w.prayerName === "Fajr")

@@ -109,12 +109,21 @@ npm run dev
 
 The app starts at `http://localhost:5173/`.
 
+### Load as Chrome Extension
+
+```bash
+npm run build:extension
+```
+
+Then open **chrome://extensions** → Enable **Developer mode** → **Load unpacked** → select the **`extension/`** folder (at project root).
+
 ### Scripts
 
 | Script | Description |
 |---|---|
 | `npm run dev` | Start Vite dev server with HMR |
 | `npm run build` | TypeScript check + production build |
+| `npm run build:extension` | Build + package as Chrome extension (ready to load) |
 | `npm run preview` | Preview production build locally |
 | `npm run lint` | Run Oxlint across the codebase |
 
@@ -126,11 +135,18 @@ The app starts at `http://localhost:5173/`.
 Social-Media-Blocker/
 ├── ARCHITECTURE.md           # Full technical architecture (data model, adapters, security)
 ├── LICENSE
+├── extension/                # Chrome extension output (load this in chrome://extensions)
+│   ├── manifest.json         # Manifest V3
+│   ├── background.js         # Service worker (heartbeat, state, blocking rules)
+│   ├── content.js            # Content script — injects block overlay into pages
+│   ├── icons/                # Extension icons (16/48/128)
+│   └── index.html            # Popup (auto-copied from smb-ui/dist/)
 └── smb-ui/                   # Frontend application
     ├── index.html
     ├── package.json
     ├── vite.config.ts        # Vite config with path aliases (@/ → src/)
     ├── tsconfig.app.json     # TypeScript config with path mapping
+    ├── scripts/              # Build helpers (copy-to-extension, generate-icons)
     ├── src/
     │   ├── main.tsx          # Entry point
     │   ├── App.tsx           # Root component + routing
@@ -141,8 +157,9 @@ Social-Media-Blocker/
     │   ├── pages/            # Route-level page components
     │   ├── store/            # Zustand state stores
     │   ├── hooks/            # Custom React hooks
-    │   └── lib/              # Utility functions + design tokens
-    └── dist/                 # Production build output
+    │   ├── lib/              # Utility functions + design tokens
+    │   └── test/             # Vitest test suite
+    └── dist/                 # Vite production build output
 ```
 
 ---
