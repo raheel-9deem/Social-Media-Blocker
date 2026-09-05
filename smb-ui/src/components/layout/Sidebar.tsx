@@ -6,6 +6,7 @@ import {
   Settings,
   Shield,
   LogOut,
+  Moon,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -14,6 +15,7 @@ const navItems = [
   { to: "/app/platforms", label: "Platforms", icon: Shield },
   { to: "/app/tracker", label: "Tracker", icon: Clock },
   { to: "/app/focus", label: "Focus Mode", icon: Target },
+  { to: "/app/namaz", label: "Namaz Mode", icon: Moon },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ]
 

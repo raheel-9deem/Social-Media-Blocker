@@ -12,6 +12,7 @@ import PlatformsPage from "@/pages/PlatformsPage"
 import TrackerPage from "@/pages/TrackerPage"
 import FocusModePage from "@/pages/FocusModePage"
 import AnalyticsPage from "@/pages/AnalyticsPage"
+import NamazPage from "@/pages/NamazPage"
 import { ErrorBoundary } from "@/components/ui/Spinner"
 
 const queryClient = new QueryClient({
@@ -57,10 +58,7 @@ export default function App() {
                 path="schedule"
                 element={<PlaceholderRoute title="Scheduled Blocks" />}
               />
-              <Route
-                path="namaz"
-                element={<PlaceholderRoute title="Namaz Mode" />}
-              />
+              <Route path="namaz" element={<NamazPage />} />
               <Route path="settings" element={<SettingsShell />} />
               <Route
                 path="*"

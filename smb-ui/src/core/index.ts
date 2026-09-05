@@ -21,3 +21,14 @@ export { type DailyLimitRuleOptions } from "./engine/rules/DailyLimitRule"
 export { FocusModeRule } from "./engine/rules/FocusModeRule"
 export { ScheduledBlockRule } from "./engine/rules/ScheduledBlockRule"
 export { NamazModeRule } from "./engine/rules/NamazModeRule"
+
+// Re-export prayer time service
+export {
+  getPrayerTimeProvider,
+  type PrayerTimeProvider,
+  type PrayerTimes,
+  type PrayerWindow,
+  type PrayerWindowConfig,
+  type CalculationMethod,
+  CALCULATION_METHODS,
+} from "./services/PrayerTimeProvider"

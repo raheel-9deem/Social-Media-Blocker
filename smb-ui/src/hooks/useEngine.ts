@@ -134,7 +134,7 @@ export function useEngine(): EngineState {
 
     async function loadAux() {
       try {
-        const [focus, blocks, _namazSettings] = await Promise.all([
+        const [focus, blocks, namazSettings] = await Promise.all([
           inMemoryStorage.getActiveFocusSession().then((s) => (s ? [s] : [])),
           inMemoryStorage.listScheduledBlocks(),
           inMemoryStorage.getNamazSettings(),
@@ -142,6 +142,19 @@ export function useEngine(): EngineState {
         if (cancelled) return
         focusSessionsRef.current = focus
         scheduledBlocksRef.current = blocks
+
+        // Convert stored prayer window strings to NamazWindow[] for the engine
+        if (namazSettings?.prayerWindows && namazSettings.prayerWindows.length > 0) {
+          const today = new Date()
+          const windows: NamazWindow[] = namazSettings.prayerWindows.map((w) => ({
+            name: w.prayerName,
+            start: new Date(`${today.toISOString().slice(0, 10)}T${w.start}:00`),
+            end: new Date(`${today.toISOString().slice(0, 10)}T${w.end}:00`),
+          }))
+          namazRef.current = windows
+        } else {
+          namazRef.current = null
+        }
       } catch {
         // ignore
       }
@@ -150,13 +163,26 @@ export function useEngine(): EngineState {
     loadAux()
 
     const unsub = inMemoryStorage.subscribeToChanges(async () => {
-      const [focus, blocks] = await Promise.all([
+      const [focus, blocks, namazSettings] = await Promise.all([
         inMemoryStorage.getActiveFocusSession().then((s) => (s ? [s] : [])),
         inMemoryStorage.listScheduledBlocks(),
+        inMemoryStorage.getNamazSettings(),
       ])
       if (cancelled) return
       focusSessionsRef.current = focus
       scheduledBlocksRef.current = blocks
+
+      if (namazSettings?.prayerWindows && namazSettings.prayerWindows.length > 0) {
+        const today = new Date()
+        const windows: NamazWindow[] = namazSettings.prayerWindows.map((w) => ({
+          name: w.prayerName,
+          start: new Date(`${today.toISOString().slice(0, 10)}T${w.start}:00`),
+          end: new Date(`${today.toISOString().slice(0, 10)}T${w.end}:00`),
+        }))
+        namazRef.current = windows
+      } else {
+        namazRef.current = null
+      }
     })
 
     return () => {

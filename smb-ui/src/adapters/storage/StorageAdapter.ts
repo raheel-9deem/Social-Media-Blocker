@@ -108,6 +108,9 @@ export interface UpdateNamazSettings {
   preBlockMinutes?: number
   postBlockMinutes?: number
   blockedPlatformIds?: ID[]
+  /** Allow updating computed prayer windows */
+  prayerWindows?: Array<{ start: string; end: string; prayerName: string }>
+  lastComputedAt?: string | null
 }
 
 // ---- Realtime ----
