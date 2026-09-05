@@ -3,11 +3,10 @@
 // time budget. Supports per-day-of-week overrides.
 // ==========================================================================
 
-import type {
-  BlockingDecision,
-  EvaluationContext,
-} from "../../types"
-import { Rule, NOT_BLOCKED } from "./Rule"
+import type { EvaluationContext } from "@/core/types"
+import type { BlockingDecision } from "@/core/types"
+import type { Rule } from "./Rule"
+import { NOT_BLOCKED } from "./Rule"
 
 export interface DailyLimitRuleOptions {
   /**
@@ -43,13 +42,11 @@ export class DailyLimitRule implements Rule {
     const platform = ctx.platforms.find((p) => p.id === platformId)
     if (!platform || !platform.isActive) return NOT_BLOCKED
 
-    // ---- Resolve the effective limit ----
-    const dayOfWeek = ctx.now.getDay() // 0=Sun … 6=Sat
+    const dayOfWeek = ctx.now.getDay() // 0=Sun ... 6=Sat
     const overrideKey = `${dayOfWeek}:${platformId}`
     const override = this.overrides.get(overrideKey)
     const limitMinutes = override ?? platform.dailyLimitMinutes
 
-    // Edge-case: zero or negative limit => treat as unlimited
     if (limitMinutes <= 0) return NOT_BLOCKED
 
     const usedMinutes = ctx.dailyUsage.get(platformId) ?? 0
@@ -64,7 +61,7 @@ export class DailyLimitRule implements Rule {
           usedMinutes,
           limitMinutes,
         },
-        unblockAt: null, // lifts at next day boundary (handled by evaluator)
+        unblockAt: null,
         activeRules: [this.name],
       }
     }

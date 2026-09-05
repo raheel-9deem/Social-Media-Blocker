@@ -6,7 +6,7 @@
 import type {
   BlockingDecision,
   EvaluationContext,
-} from "../types"
+} from "../../types"
 
 export interface Rule {
   /** Human-readable name, e.g. "DailyLimitRule" */

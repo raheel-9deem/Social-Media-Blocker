@@ -2,13 +2,25 @@
 // ScheduledBlockRule — blocks during user-defined time windows.
 // ==========================================================================
 
-import type { BlockingDecision, EvaluationContext } from "../../types"
-import { Rule, NOT_BLOCKED } from "./Rule"
+import type { BlockingDecision } from "@/core/types"
+import type { Rule } from "./Rule"
+import { NOT_BLOCKED } from "./Rule"
 
 export class ScheduledBlockRule implements Rule {
   readonly name = "ScheduledBlockRule"
 
-  evaluate(platformId: string, ctx: EvaluationContext): BlockingDecision {
+  evaluate(platformId: string, ctx: {
+    now: Date
+    scheduledBlocks: Array<{
+      id: string
+      platformIds: string[]
+      name?: string
+      startTime: string
+      endTime: string
+      daysOfWeek: number[]
+      isActive: boolean
+    }>
+  }): BlockingDecision {
     if (ctx.scheduledBlocks.length === 0) return NOT_BLOCKED
 
     const now = ctx.now
@@ -22,7 +34,6 @@ export class ScheduledBlockRule implements Rule {
       const blocksThis = block.platformIds.includes(platformId)
       if (!blocksAll && !blocksThis) continue
 
-      // Parse start/end time strings (HH:MM) in user's timezone
       const [sh, sm] = block.startTime.split(":").map(Number)
       const [eh, em] = block.endTime.split(":").map(Number)
 
@@ -33,7 +44,7 @@ export class ScheduledBlockRule implements Rule {
       const isInWindow =
         endMinutes >= startMinutes
           ? currentMinutes >= startMinutes && currentMinutes < endMinutes
-          : currentMinutes >= startMinutes || currentMinutes < endMinutes // crosses midnight
+          : currentMinutes >= startMinutes || currentMinutes < endMinutes
 
       if (isInWindow) {
         return {

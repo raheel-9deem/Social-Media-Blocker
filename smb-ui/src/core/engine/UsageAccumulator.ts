@@ -4,10 +4,10 @@
 // plain UsageLog[] arrays supplied by an Adapter layer (e.g. Supabase).
 // ==========================================================================
 
-import type { UsageLog } from "../../types"
+import type { UsageLog } from "../types"
 
 /**
- * Key format: "userId:YYYY-MM-DD" → Map<platformId, totalMinutes>
+ * Key format: "userId:YYYY-MM-DD" -> Map<platformId, totalMinutes>
  */
 const DAY_KEY = (userId: string, date: Date): string =>
   `${userId}:${dayKey(date)}`
@@ -20,7 +20,7 @@ const dayKey = (date: Date): string => {
 }
 
 export interface AccumulatorSnapshot {
-  /** platformId → total minutes used */
+  /** platformId -> total minutes used */
   usage: Map<string, number>
   /** Total sessions counted */
   totalSessions: number
@@ -36,9 +36,7 @@ export interface AccumulatorSnapshot {
  *   acc.getRemaining(platformId, 60) // remaining budget
  */
 export class UsageAccumulator {
-  /** userId+day → platformId → minutes */
   private data: Map<string, Map<string, number>> = new Map()
-  /** userId+day → total session count */
   private sessionCounts: Map<string, number> = new Map()
 
   /**

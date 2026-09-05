@@ -9,14 +9,14 @@
 //   4. NamazModeRule
 // ==========================================================================
 
-import type { BlockingDecision, EvaluationContext } from "../../types"
+import type { BlockingDecision, EvaluationContext } from "../types"
 import type { Rule } from "./rules/Rule"
 
 /**
  * A snapshot of blocking results for all active platforms.
  */
 export interface EvaluationResult {
-  /** platformId → blocking decision */
+  /** platformId -> blocking decision */
   decisions: Map<string, BlockingDecision>
   /** Did any rule fire on at least one platform? */
   hasAnyBlock: boolean

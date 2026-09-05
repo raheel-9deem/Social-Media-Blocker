@@ -67,7 +67,7 @@ function OnboardingPage() {
 
   function handleNext() {
     if (step < 3) {
-      setStep((s) => Math.min(3, (s + 1) as Step))
+      setStep(Math.min(3, step + 1) as Step)
     } else {
       navigate("/app")
     }
@@ -192,7 +192,7 @@ function OnboardingPage() {
                   </div>
                   <Toggle
                     checked={focusMode}
-                    onCheckedChange={setFocusMode}
+                    onCheckedChange={(checked) => setFocusMode(checked)}
                   />
                 </Card>
                 <Card className="flex items-center justify-between">
@@ -207,7 +207,7 @@ function OnboardingPage() {
                   </div>
                   <Toggle
                     checked={namazMode}
-                    onCheckedChange={setNamazMode}
+                    onCheckedChange={(checked) => setNamazMode(checked)}
                   />
                 </Card>
               </div>
@@ -220,7 +220,7 @@ function OnboardingPage() {
               <Button
                 variant="outline"
                 className="flex-1"
-                onClick={() => setStep((s) => Math.max(1, (s - 1) as Step))}
+                onClick={() => setStep(Math.max(1, step - 1) as Step)}
               >
                 Back
               </Button>

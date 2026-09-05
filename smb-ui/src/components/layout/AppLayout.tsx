@@ -30,8 +30,8 @@ function AppLayout() {
 
       {/* Mobile Sheet (hamburger nav) */}
       {isMobile && (
-        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetContent side="left" className="!w-72 p-0">
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen} side="left">
+          <SheetContent className="!w-72 p-0">
             <div className="flex items-center justify-between px-4 h-14 border-b border-slate-100">
               <span className="font-semibold text-slate-900 text-sm">Menu</span>
               <button

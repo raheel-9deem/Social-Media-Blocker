@@ -82,7 +82,7 @@ function LoginPage() {
               </button>
             }
           />
-          <Button type="submit" className="w-full" loading={loading}>
+          <Button type="submit" className="w-full" isLoading={loading}>
             Sign In
           </Button>
         </form>

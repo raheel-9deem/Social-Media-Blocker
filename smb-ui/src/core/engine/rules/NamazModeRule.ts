@@ -2,13 +2,20 @@
 // NamazModeRule — blocks platforms during prayer windows.
 // ==========================================================================
 
-import type { BlockingDecision, EvaluationContext } from "../../types"
-import { Rule, NOT_BLOCKED } from "./Rule"
+import type { BlockingDecision } from "@/core/types"
+import type { Rule } from "./Rule"
+import { NOT_BLOCKED } from "./Rule"
 
 export class NamazModeRule implements Rule {
   readonly name = "NamazModeRule"
 
-  evaluate(platformId: string, ctx: EvaluationContext): BlockingDecision {
+  evaluate(
+    _platformId: string,
+    ctx: {
+      namazWindows: Array<{ name: string; start: Date; end: Date }> | null
+      now: Date
+    }
+  ): BlockingDecision {
     if (!ctx.namazWindows || ctx.namazWindows.length === 0) return NOT_BLOCKED
 
     for (const window of ctx.namazWindows) {

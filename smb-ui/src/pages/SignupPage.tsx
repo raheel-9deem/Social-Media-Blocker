@@ -36,7 +36,7 @@ function SignupPage() {
     const result = schema.safeParse(form)
     if (!result.success) {
       const fieldErrors: Partial<Record<keyof FormData, string>> = {}
-      for (const err of result.error.errors) {
+      for (const err of result.error.issues) {
         const path = err.path[0] as keyof FormData
         fieldErrors[path] = err.message
       }
@@ -106,7 +106,7 @@ function SignupPage() {
             error={errors.confirmPassword}
             onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
           />
-          <Button type="submit" className="w-full" loading={loading}>
+          <Button type="submit" className="w-full" isLoading={loading}>
             Create Account
           </Button>
         </form>

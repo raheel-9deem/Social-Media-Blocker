@@ -6,10 +6,10 @@
 // directly (with a warning that a server-time adapter should be plugged in).
 // ==========================================================================
 
-import type { DayBoundary } from "../../types"
+import type { DayBoundary } from "../types"
 
 /**
- * Compute the UTC offset (as ±HH:MM) for a given timezone at a given instant.
+ * Compute the UTC offset (as +HH:MM) for a given timezone at a given instant.
  * Falls back to UTC if the timezone is unknown.
  */
 function getUTCOffset(timezone: string, date: Date): string {

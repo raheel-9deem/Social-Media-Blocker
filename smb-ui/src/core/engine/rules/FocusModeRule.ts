@@ -2,17 +2,30 @@
 // FocusModeRule — blocks platforms during active focus sessions.
 // ==========================================================================
 
-import type { BlockingDecision, EvaluationContext } from "../../types"
-import { Rule, NOT_BLOCKED } from "./Rule"
+import type { BlockingDecision } from "@/core/types"
+import type { Rule } from "./Rule"
+import { NOT_BLOCKED } from "./Rule"
 
 export class FocusModeRule implements Rule {
   readonly name = "FocusModeRule"
 
-  evaluate(platformId: string, ctx: EvaluationContext): BlockingDecision {
+  evaluate(platformId: string, ctx: {
+    userId: string
+    userTimezone: string
+    now: Date
+    platforms: Array<{ id: string; isActive: boolean }>
+    dailyUsage: Map<string, number>
+    activeFocusSessions: Array<{
+      id: string
+      platformIds: string[]
+      endsAt: string
+    }>
+    scheduledBlocks: any[]
+    namazWindows: any[] | null
+  }): BlockingDecision {
     if (ctx.activeFocusSessions.length === 0) return NOT_BLOCKED
 
     for (const session of ctx.activeFocusSessions) {
-      // Empty platformIds = block ALL platforms
       const blocksAll = session.platformIds.length === 0
       const blocksThis = session.platformIds.includes(platformId)
 
