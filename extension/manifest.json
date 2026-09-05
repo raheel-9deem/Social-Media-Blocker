@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MediaBlocker Extension",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Smart social media blocker — popup + content-based blocking",
   "icons": {
     "16": "icons/icon-16.png",

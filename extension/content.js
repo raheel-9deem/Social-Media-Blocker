@@ -72,7 +72,9 @@
       "</p>",
     ].join("")
 
-    document.documentElement.appendChild(overlay)
+    if (document.documentElement) {
+      document.documentElement.appendChild(overlay)
+    }
 
     // Prevent DevTools shortcut
     document.addEventListener("keydown", preventNav, true)

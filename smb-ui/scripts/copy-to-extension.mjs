@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs"
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -13,6 +13,14 @@ if (!existsSync(distDir)) {
 }
 
 console.log("Copying build output to extension/ …")
+
+// Remove only old Vite build artifacts before copying fresh ones
+for (const name of ["index.html", "favicon.svg", "icons.svg"]) {
+  const p = resolve(extDir, name)
+  if (existsSync(p)) rmSync(p)
+}
+const assetsDir = resolve(extDir, "assets")
+if (existsSync(assetsDir)) rmSync(assetsDir, { recursive: true })
 
 function copyRecursive(src, dst) {
   const entries = readdirSync(src)

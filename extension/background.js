@@ -61,7 +61,7 @@ chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
         }
         default:
           sendResponse({ error: "Unknown message type" })
-    }
+      }
     } catch (err) {
       sendResponse({ error: err.message })
     }
