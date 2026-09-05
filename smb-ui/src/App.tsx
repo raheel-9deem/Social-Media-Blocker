@@ -8,6 +8,10 @@ import OnboardingPage from "@/pages/OnboardingPage"
 import AppLayout from "@/components/layout/AppLayout"
 import DashboardPage from "@/pages/DashboardPage"
 import SettingsShell from "@/pages/SettingsShell"
+import PlatformsPage from "@/pages/PlatformsPage"
+import TrackerPage from "@/pages/TrackerPage"
+import FocusModePage from "@/pages/FocusModePage"
+import AnalyticsPage from "@/pages/AnalyticsPage"
 import { ErrorBoundary } from "@/components/ui/Spinner"
 
 const queryClient = new QueryClient({
@@ -45,22 +49,10 @@ export default function App() {
             {/* Protected (App shell) */}
             <Route path="/app" element={<AppLayout />}>
               <Route index element={<DashboardPage />} />
-              <Route
-                path="platforms"
-                element={<PlaceholderRoute title="Platforms" />}
-              />
-              <Route
-                path="tracker"
-                element={<PlaceholderRoute title="Tracker" />}
-              />
-              <Route
-                path="focus"
-                element={<PlaceholderRoute title="Focus Mode" />}
-              />
-              <Route
-                path="analytics"
-                element={<PlaceholderRoute title="Analytics" />}
-              />
+              <Route path="platforms" element={<PlatformsPage />} />
+              <Route path="tracker" element={<TrackerPage />} />
+              <Route path="focus" element={<FocusModePage />} />
+              <Route path="analytics" element={<AnalyticsPage />} />
               <Route
                 path="schedule"
                 element={<PlaceholderRoute title="Scheduled Blocks" />}
