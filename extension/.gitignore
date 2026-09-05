@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Build output (recreated by npm run build:extension)
+dist/
+assets/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

@@ -36,80 +36,68 @@ YouTube, Instagram, TikTok, Twitter / X, Facebook, Reddit
 
 ## Architecture
 
-The extension is fully self-contained. The entire React app runs inside the browser toolbar popup — no web app, no server, no account.
+The entire app lives in **one folder** — `extension/`. No servers, no separate web app, no account system.
 
 ```
-extension/                       ← THIS IS ALL YOU NEED
+extension/                       ← ONE FOLDER, EVERYTHING INSIDE
 ├── manifest.json                # Chrome Extension Manifest V3
-├── background.js                # Service worker (heartbeat, state, blocking rules)
-├── content.js                   # Content script — injects block overlay into pages
+├── background.js                # Service worker (heartbeat, blocking rules)
+├── content.js                   # Content script — injects block overlay
 ├── icons/                       # Extension icons (16/48/128)
-│   ├── icon-16.png
-│   ├── icon-48.png
-│   └── icon-128.png
+├── package.json                 # npm config
+├── vite.config.ts               # Build configuration
+├── tsconfig.json                # TypeScript config
 ├── index.html                   # Popup entry (built React app)
-└── assets/
-    └── index-[hash].js          # Bundled React app + styles
+├── assets/                      # Bundled React app (node_modules not required)
+└── src/                         # React source code
+    ├── main.tsx                 # Entry point
+    ├── App.tsx                  # Routing + layout
+    ├── core/                    # Blocking engine (platform-independent)
+    ├── components/              # UI components
+    ├── pages/                   # Dashboard, Focus, Namaz, etc.
+    ├── store/                   # Zustand state
+    ├── hooks/                   # Custom hooks
+    └── adapters/                # Storage, tracking, notifications
 ```
 
 ### How It Works
 
-1. **Popup** — Click the extension icon in Chrome toolbar. A full React SPA opens with Dashboard, Analytics, Focus Mode, Namaz Mode, Tracker, Platforms, and Settings.
-2. **Blocking** — When a platform is blocked, `background.js` + `content.js` inject a full-screen overlay on matching sites.
-3. **Storage** — Data lives in memory during the session. No server, no sync, no account needed.
-
-### Blocking Rules (Priority Order)
-
-1. **Daily Limit** — Platform exceeded its daily time budget
-2. **Focus Mode** — Active focus session is running
-3. **Scheduled Blocks** — User-defined time window
-4. **Namaz Mode** — Prayer window active
+1. **Popup** — Click the extension icon in Chrome toolbar. A full React SPA opens.
+2. **Blocking** — When blocked, `background.js` + `content.js` inject a full-screen overlay.
+3. **Storage** — Data lives in-memory. No server, no sync, no account.
 
 ---
 
-## Install for Users
-
-1. Download or clone this repository
-2. Open terminal in the project folder
-3. Run:
-   ```bash
-   cd smb-ui
-   npm install
-   npm run build:extension
-   ```
-4. Open **chrome://extensions** in Chrome
-5. Enable **Developer mode** (top-right toggle)
-6. Click **Load unpacked**
-7. Select the **`extension/`** folder
-
-That's it. Click the extension icon in your toolbar to open the app.
-
-> Note: After loading, if you change the code, run `npm run build:extension` again, then click **Reload** on the extension card in `chrome://extensions`.
-
----
-
-## Development
+## Install for Development
 
 ```bash
-cd smb-ui
+cd extension
 npm install
 npm run dev
 ```
 
-Opens a dev server at `http://localhost:5173/` for UI development.
+Opens a dev server at `http://localhost:5173/`.
+
+## Build the Extension
 
 ```bash
-npm run build          # TypeScript check + Vite production build
-npm run build:extension # Build + copy to extension/ folder
-npm run preview        # Preview production build locally
-npm run lint           # Run Oxlint
+npm run build:extension
 ```
 
----
+This compiles TypeScript + Vite build, then copies the output into the `extension/` root (preserving `manifest.json`, `background.js`, `content.js`, and `icons/`).
 
-## Core Engine (`smb-ui/src/core/`)
+## Load in Chrome
 
-Zero dependencies on React, Supabase, or any browser/Node API. Platform-independent domain logic.
+1. Open **chrome://extensions**
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select the **`extension/`** folder
+
+Click the extension icon to open the app. After code changes, run `npm run build:extension` and click **Reload**.
+
+## Core Engine (`src/core/`)
+
+Zero dependencies on React or any browser/Node API. Platform-independent domain logic.
 
 | Module | Responsibility |
 |---|---|
