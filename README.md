@@ -6,6 +6,8 @@ A calm, minimal, and modern digital-wellbeing Chrome extension. No account, no d
 > **Work in Progress / Known Issues:**
 > This application is currently in early active development and contains **significant bugs and UI/interaction issues** (several buttons, toggles, and UI layouts are not working properly yet). It is **NOT** ready for production use yet.
 > 
+> 🛠️ **Fixes Coming Soon:** All of these issues and bugs are actively being addressed and **will be fixed very soon in upcoming updates**.
+> 
 > 🤝 **Contributions are fully open!** Anyone is welcome to jump in, fix bugs, improve the UI/UX, or implement features. All contributors will have their credits permanently added to this repository!
 
 ---
@@ -123,6 +125,9 @@ The extension is currently under active refactoring and **contains notable bugs*
 - **UI & Layout Inconsistencies:** The interface currently has styling quirks and layout constraints between Chrome's extension popup container and standalone browser viewports.
 - **Build & Asset Syncing:** The build pipeline and file copy routines occasionally miss CSS outputs or entry point bindings.
 - **Extension Runtime Bridge:** In-memory storage and Chrome service worker message bridging have edge-case failures when accessed outside of the extension context.
+
+> [!NOTE]
+> **Fixes are on the way:** Active work is underway to resolve all of these issues. A clean, fully working, and redesigned version will be rolled out very soon.
 
 ---
 
