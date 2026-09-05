@@ -3,36 +3,34 @@
 // cross-instance messaging for the MediaBlocker extension.
 // ==========================================================================
 
-// ---- State ----
-
-const STATE_KEY = "mediaBlockerState"
+var STATE_KEY = "mediaBlockerState"
 
 function loadState() {
   try {
-    return JSON.parse(chrome.storage.local.get(STATE_KEY))[STATE_KEY] || {}
-  } catch {
+    var raw = localStorage.getItem(STATE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch (e) {
     return {}
   }
 }
 
-function saveState(state: Record<string, any>) {
-  chrome.storage.local.set({ [STATE_KEY]: state })
+function saveState(state) {
+  localStorage.setItem(STATE_KEY, JSON.stringify(state))
 }
 
 // ---- Alarms ----
 
-chrome.runtime.onInstalled.addListener(() => {
-  // Evaluate blocking once on install
+chrome.runtime.onInstalled.addListener(function () {
   chrome.alarms.create("heartbeat", { periodInMinutes: 1 })
 })
 
-chrome.alarms.onAlarm.addListener((alarm) => {
+chrome.alarms.onAlarm.addListener(function (alarm) {
   if (alarm.name === "heartbeat") {
-    // Heartbeat triggers content scripts to re-check blocking state
-    chrome.tabs.query({}, (tabs) => {
-      for (const tab of tabs) {
-        if (tab.id && tab.url && !tab.url.startsWith("chrome://")) {
-          chrome.tabs.sendMessage(tab.id, { type: "HEARTBEAT" }).catch(() => {})
+    chrome.tabs.query({}, function (tabs) {
+      for (var i = 0; i < tabs.length; i++) {
+        var tab = tabs[i]
+        if (tab.id && tab.url && tab.url.indexOf("chrome://") !== 0) {
+          chrome.tabs.sendMessage(tab.id, { type: "HEARTBEAT" })
         }
       }
     })
@@ -41,71 +39,102 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 
 // ---- Messages ----
 
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  ;(async () => {
-    switch (msg.type) {
-      case "GET_STATE": {
-        const state = await chrome.storage.local.get(STATE_KEY)
-        sendResponse(state[STATE_KEY] || {})
-        break
-      }
-      case "SET_STATE": {
-        const current = (await chrome.storage.local.get(STATE_KEY))[STATE_KEY] || {}
-        saveState({ ...current, ...msg.payload })
-        sendResponse({ ok: true })
-        break
-      }
-      case "BLOCK_URLS": {
-        // Update declarative net request rules (Manifest V3)
-        await updateBlockRules(msg.urls || [])
-        sendResponse({ ok: true })
-        break
-      }
-      default:
-        sendResponse({ error: "Unknown message type" })
+chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
+  ;(async function () {
+    try {
+      switch (msg.type) {
+        case "GET_STATE": {
+          var result = await chrome.storage.local.get(STATE_KEY)
+          sendResponse(result[STATE_KEY] || {})
+          break
+        }
+        case "SET_STATE": {
+          var current = (await chrome.storage.local.get(STATE_KEY))[STATE_KEY] || {}
+          saveState(Object.assign({}, current, msg.payload))
+          sendResponse({ ok: true })
+          break
+        }
+        case "BLOCK_URLS": {
+          await updateBlockRules(msg.urls || [])
+          sendResponse({ ok: true })
+          break
+        }
+        default:
+          sendResponse({ error: "Unknown message type" })
     }
-  })().catch((e) => sendResponse({ error: e.message }))
+    } catch (err) {
+      sendResponse({ error: err.message })
+    }
+  })()
 
-  return true // keep message channel open for async response
+  return true
 })
 
 // ---- Declarative Net Request (block list) ----
 
-const RULE_RESOURCE_TYPE = 1 // MAIN_FRAME
-
-async function updateBlockRules(urls: string[]) {
+async function updateBlockRules(urls) {
   try {
-    const rules = urls.map((host, i) => ({
-      id: i + 1,
-      priority: 1,
-      action: { type: "block" },
-      condition: {
-        urlFilter: `*://${host}/*`,
-        resourceTypes: [RULE_RESOURCE_TYPE],
-      },
-    }))
+    var rules = []
+    for (var i = 0; i < urls.length; i++) {
+      rules.push({
+        id: i + 1,
+        priority: 1,
+        action: { type: "block" },
+        condition: {
+          urlFilter: "*://" + urls[i] + "/*",
+          resourceTypes: [1]
+        }
+      })
+    }
 
-    // Remove existing dynamic rules, add new ones
-    const existing = await chrome.declarativeNetRequest.getDynamicRules()
-    const removeRuleIds = existing.map((r) => r.id)
+    var existing = await chrome.declarativeNetRequest.getDynamicRules()
+    var removeRuleIds = existing.map(function (r) { return r.id })
     await chrome.declarativeNetRequest.updateDynamicRules({
-      removeRuleIds,
-      addRules: rules,
+      removeRuleIds: removeRuleIds,
+      addRules: rules
     })
-  } catch {
-    // declarativeNetRequest API may not be available in all contexts
+  } catch (e) {
+    // DNR API may not be available; fallback handled by content script
   }
 }
 
 // ---- Notifications ----
 
-function showNotification(title: string, body: string) {
-  chrome.notifications.create({
+function showNotification(title, body) {
+  chrome.notifications.create("mediaBlocker-" + Date.now(), {
     type: "basic",
     iconUrl: "icons/icon-128.png",
-    title,
-    message: body,
+    title: title,
+    message: body
   })
 }
+
+// ---- Listen for block changes from popup ----
+
+chrome.runtime.onMessage.addListener(function (msg) {
+  if (msg.type === "APPLY_BLOCK") {
+    var state = loadState()
+    state.isBlocked = msg.isBlocked
+    state.blockedHosts = msg.blockedHosts || []
+    saveState(state)
+    updateBlockRules(state.blockedHosts)
+
+    // Notify all tabs
+    chrome.tabs.query({}, function (tabs) {
+      for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].id && tabs[i].url && tabs[i].url.indexOf("chrome://") !== 0) {
+          chrome.tabs.sendMessage(tabs[i].id, {
+            type: "BLOCK_UPDATE",
+            isBlocked: msg.isBlocked
+          })
+        }
+      }
+    })
+
+    if (msg.isBlocked) {
+      showNotification("Focus Mode Active", "Social media is now blocked.")
+    }
+  }
+})
 
 console.log("[MediaBlocker] Background service worker started")
